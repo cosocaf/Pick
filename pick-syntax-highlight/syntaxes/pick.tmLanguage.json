@@ -1,0 +1,127 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "pick",
+	"patterns": [
+		{"include": "#comments"},
+		{"include": "#keywords"},
+		{"include": "#storages"},
+		{"include": "#constants"},
+		{"include": "#strings"},
+		{"include": "#variables"}
+	],
+	"repository": {
+		"keywords": {
+			"patterns": [{
+				"name": "keyword.control.pick",
+				"match": "\\b(if|else|while|for|loop|return)\\b"
+			}]
+		},
+		"comments": {
+			"patterns": [{
+				"name": "comment.line.double-slash.pick",
+				"match": "//.*"
+			}]
+		},
+		"storages": {
+			"patterns": [
+				{
+					"name": "storage.modifier.pick",
+					"match": "\\b(pub|pri|extern|import)\\b"
+				},
+				{
+					"match": "\\b(fn)\\s+([^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*)?",
+					"captures": {
+						"1": {"name": "storage.type"},
+						"2": {"name": "entity.name.function"}
+					}
+				},
+				{
+					"match": "\\b(class)\\s+([^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*)?",
+					"captures": {
+						"1": {"name": "storage.type"},
+						"2": {"name": "entity.name.class"}
+					}
+				},
+				{
+					"match": "\\b(type)\\s+([^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*)?",
+					"captures": {
+						"1": {"name": "storage.type"},
+						"2": {"name": "entity.name.type"}
+					}
+				},
+				{
+					"match": "\\b(def|mut)\\s+([^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*)?",
+					"captures": {
+						"1": {"name": "storage.type"},
+						"2": {"name": "variable.name"}
+					}
+				},
+				{
+					"name": "entity.name.function.construct.pick",
+					"match": "\\bconstruct\\b"
+				},
+				{
+					"name": "entity.name.function.destruct.pick",
+					"match": "\\bdestruct\\b"
+				},
+				{
+					"match": "([^\\s!-@\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*)(\\(.*\\))",
+					"captures": {
+						"1": {"name": "entity.name.function.call.pick"},
+						"2": {"patterns": [{"include": "$self"}]}
+					}
+				}
+			]
+		},
+		"constants": {
+			"patterns": [
+				{
+					"name": "constant.numeric.int.pick",
+					"match": "\\b\\d+(i8|i16|i32|i64|u8|u16|u32|u64)?\\b"
+				},
+				{
+					"name": "constant.numeric.float.pick",
+					"match": "\\b\\d+(\\.\\d+)?(e(\\+|-)\\d+)?(f32|f64)?\\b"
+				},
+				{
+					"name": "constant.character.pick",
+					"match": "\\b'\\.'\\b"
+				}
+			]
+		},
+		"strings": {
+			"patterns": [
+				{
+					"name": "string.quoted.double.pick",
+					"begin": "\"",
+					"end": "\"",
+					"match": "\"[^\\n]*\""
+				},
+				{
+					"name": "string.interpolated.pick",
+					"begin": "`",
+					"end": "`",
+					"patterns": [
+						{
+							"name": "constant.character.escape.pick",
+							"match": "\\."
+						}
+					]
+				}
+			]
+		},
+		"variables": {
+			"patterns": [
+				{
+					"name": "variable.language",
+					"match": "\\b(true|false|this|self|void|i8|i16|i32|i64|u8|u16|u32|u64|bool|char)\\b"
+				},
+				{
+					"name": "variable.name",
+					"match": "[^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*"
+				}
+			]
+		}
+	},
+	"scopeName": "source.pick"
+}

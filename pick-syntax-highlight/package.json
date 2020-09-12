@@ -1,0 +1,26 @@
+{
+    "publisher": "cosocaf",
+    "name": "pick-syntax-highlight",
+    "displayName": "Pick Syntax Highlight",
+    "description": "Language Support for Pick",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.47.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [{
+            "id": "pick",
+            "aliases": ["pick", "pick"],
+            "extensions": [".pick"],
+            "configuration": "./language-configuration.json"
+        }],
+        "grammars": [{
+            "language": "pick",
+            "scopeName": "source.pick",
+            "path": "./syntaxes/pick.tmLanguage.json"
+        }]
+    }
+}

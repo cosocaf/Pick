@@ -1,0 +1,11 @@
+extern GetStdHandle(nStdHandle: i32): u64;
+extern WriteConsoleA(hConsoleOutput: u64, lpBuffer: char[], len: i32, lpLen: char[], lpReserved: u64): void;
+
+fn print(text: char[], len: u64): void {
+  def handle = GetStdHandle(-11);
+  WriteConsoleA(handle, text, len, 0, 0);
+}
+
+fn main(): i32 {
+  print("Hello, World\n", 13);
+} 

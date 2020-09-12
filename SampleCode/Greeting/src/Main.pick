@@ -1,0 +1,7 @@
+import Japanese;
+import English;
+
+fn main(): i32 {
+  Japanese::greeting();
+  English::greeting();
+}
