@@ -179,6 +179,7 @@ namespace pick::ir
         Register* base;
         Register* index;        // nullptrなら左辺値参照、そうでなければ配列参照
         Register* value;
+        std::string globalVar;  // baseがnullptrであれば使用する
     };
     struct AllocInstruction
     {
@@ -275,6 +276,7 @@ namespace pick::ir
         Result<Register*, std::vector<std::string>> varDefGenerate(const syntax::VariableDefine* varDef, std::vector<InstructionBlock*>& blocks, std::vector<Register*>& regs, std::unordered_map<std::string, Register*>& vars, SymbolTable* table);
         Result<Register*, std::vector<std::string>> nodeGenerate(const syntax::Node* node, std::vector<InstructionBlock*>& blocks, std::vector<Register*>& regs, std::unordered_map<std::string, Register*>& vars, SymbolTable* table);
         Result<Function*, std::vector<std::string>> functionGenerate(const syntax::FunctionDefine* fnDef, SymbolTable* symbolTable);
+        Result<Function*, std::vector<std::string>> globalVarDefGenerate(Symbol& symbol, SymbolTable* symbolTable);
         Result<_, std::vector<std::string>> generate(SymbolTable* table);
         Result<SymbolTable*, std::vector<std::string>> generate(const syntax::SyntaxTree& tree);
         Result<SymbolTable*, std::vector<std::string>> generate(const ModuleNode& node);

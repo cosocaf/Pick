@@ -41,7 +41,12 @@ namespace pick::syntax
     }
     bool Parser::eos()
     {
-        return currentSequence + 1 >= sequence.tokens.size();
+        using namespace token;
+        while (true) {
+            if (currentSequence + 1 >= sequence.tokens.size()) return true;
+            if (sequence.tokens[currentSequence + 1].kind == TokenKind::LineComment) ++currentSequence;
+            else return false;
+        }
     }
     bool Parser::isBackUnaryOperator(token::TokenKind kind)
     {

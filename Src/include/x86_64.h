@@ -218,6 +218,7 @@ namespace pick::x86_64
     {
         Register,
         Memory,
+        Address,
         Constant,
         Runtime,
     };
@@ -241,14 +242,7 @@ namespace pick::x86_64
     struct Operation
     {
         Opecode opecode;
-        /*
-            binary: オペランドのバイト数
-            jcc: ジャンプ先のブロックインデックス
-            call: コール先の関数のインデックス
-            fjmp: ジャンプ先の関数のインデックス
-            addressof: オペランドの相対参照値
-        */
-        size_t size;
+        size_t size;        // オペランドのバイト数
         RM op1;
         std::optional<RM> op2;
         std::optional<int32_t> imm;
@@ -263,6 +257,7 @@ namespace pick::x86_64
         static Operation ra(Opecode opecode, Register dist, Register base, Register index, int scale, int32_t ref, size_t size);
         static Operation ri(Opecode opecode, Register dist, int32_t imm, size_t size);
         static Operation ar(Opecode opecode, Register dist, Register src, size_t size);
+        static Operation ar(Opecode opecode, RMType type, uint64_t address, Register src, size_t size);
         static Operation ar(Opecode opecode, Register base, int32_t ref, Register src, size_t size);
         static Operation ar(Opecode opecode, Register base, Register index, int scale, int32_t ref, Register src, size_t size);
         static Operation ai(Opecode opecode, Register dist, int32_t imm, size_t size);
@@ -275,7 +270,7 @@ namespace pick::x86_64
     struct Routine
     {
         uint64_t address;   // リンカで使用する。
-        std::vector<std::vector<Operation>> ops;
+        std::vector<std::vector<Operation>> ops;    // irのブロック区切りの命令列挙
         std::vector<uint8_t> code;
         std::vector<Relocation> relocs;
     };
@@ -320,10 +315,51 @@ namespace pick::x86_64
         std::vector<ConstantSymbol> constSymbols;
         std::vector<RuntimeSymbol> runtimeSymbols;
     };
+    enum struct VarType
+    {
+        Register,
+        Spill,
+        Phi,
+        Array,
+        ConstantSymbol,
+        RuntimeSymbol,
+        FunctionSymbol,
+    };
+    struct Var
+    {
+        VarType type;
+        union
+        {
+            x86_64::Register reg;
+            int32_t offset;
+            struct {
+                int32_t base;
+                int32_t elemSize;
+            } array;
+            size_t indexOfData;
+        };
+    };
+    struct RegState
+    {
+        Var* inUse = nullptr;
+        bool hasBeenUsed = false;
+    };
+    enum struct Cond
+    {
+        Undef,
+        Equal,
+        NotEqual,
+        GreaterEqual,
+        GreaterThan,
+        LessEqual,
+        LessThan
+    };
     class X86_64Compiler
     {
         ir::IntermediateRepresentation ir;
         X86_64 x86_64;
+        Result<std::vector<std::vector<Operation>>, std::vector<std::string>> commonCompileRoutine(const ir::Function* fn, std::unordered_map<x86_64::Register, RegState>& regs, int32_t& offset);
+        Result<_, std::vector<std::string>> compileOperation(Routine& routine, int32_t len, const std::vector<uint8_t>& prologue, const std::vector<uint8_t>& epilogue);
         Result<Routine, std::vector<std::string>> compileRoutine(const ir::Function* fn);
     public:
         X86_64Compiler(const ir::IntermediateRepresentation& ir);
