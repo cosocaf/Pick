@@ -764,7 +764,6 @@ namespace pick::x86_64
                     {
                         assert(exists(vars, inst->load->array.base));
                         assert(exists(vars, inst->load->array.suffix));
-                        assert(vars[inst->load->array.base]->type == VarType::Array);
                         Var* next = nullptr;
                         if (exists(vars, inst->load->dist)) {
                             next = vars[inst->load->dist];
@@ -774,20 +773,20 @@ namespace pick::x86_64
                             next = nextReg(inst->load->dist);
                         }
                         ops += Operation::rr(Opecode::MOV, Register::RAX, Register::RBP, 8);
-                        ops += Operation::ri(Opecode::ADD, Register::RAX, vars[inst->load->array.base]->array.base, 8);
+                        ops += Operation::ri(Opecode::ADD, Register::RAX, vars[inst->load->array.base]->offset, 8);
                         switch (next->type) {
                         case VarType::Register:
                             switch (vars[inst->load->array.suffix]->type) {
                             case VarType::Register:
                                 ops += Operation::rr(Opecode::MOV, next->reg, vars[inst->load->array.suffix]->reg, 8);
-                                ops += Operation::ri(Opecode::IMUL, next->reg, vars[inst->load->array.base]->array.elemSize, 8);
+                                ops += Operation::ri(Opecode::IMUL, next->reg, ir::sizeOfType(*inst->load->array.base->symbol.type.array.type), 8);
                                 ops += Operation::rr(Opecode::ADD, Register::RAX, next->reg, 8);
                                 ops += Operation::ra(Opecode::MOV, next->reg, Register::RAX, 8);
                                 break;
                             case VarType::Spill:
                             case VarType::Phi:
                                 ops += Operation::ra(Opecode::MOV, next->reg, Register::RBP, vars[inst->load->array.suffix]->offset, 8);
-                                ops += Operation::ri(Opecode::IMUL, next->reg, vars[inst->load->array.base]->array.elemSize, 8);
+                                ops += Operation::ri(Opecode::IMUL, next->reg, ir::sizeOfType(*inst->load->array.base->symbol.type.array.type), 8);
                                 ops += Operation::rr(Opecode::ADD, Register::RAX, next->reg, 8);
                                 ops += Operation::ra(Opecode::MOV, next->reg, Register::RAX, 8);
                                 break;
@@ -801,7 +800,7 @@ namespace pick::x86_64
                             case VarType::Register:
                                 ops += Operation::r(Opecode::PUSH, Register::RAX);
                                 ops += Operation::rr(Opecode::MOV, Register::RAX, vars[inst->load->array.suffix]->reg, 8);
-                                ops += Operation::ri(Opecode::IMUL, Register::RAX, -vars[inst->load->array.base]->array.elemSize, 8);
+                                ops += Operation::ri(Opecode::IMUL, Register::RAX, -static_cast<int32_t>(ir::sizeOfType(*inst->load->array.base->symbol.type.array.type)), 8);
                                 ops += Operation::ar(Opecode::SUB, Register::RSP, 8, Register::RAX, 8);
                                 ops += Operation::r(Opecode::POP, Register::RAX);
                                 ops += Operation::ra(Opecode::MOV, Register::RAX, Register::RAX, 8);
@@ -811,7 +810,7 @@ namespace pick::x86_64
                             case VarType::Phi:
                                 ops += Operation::r(Opecode::PUSH, Register::RAX);
                                 ops += Operation::ra(Opecode::MOV, Register::RAX, Register::RBP, vars[inst->load->array.suffix]->offset, 8);
-                                ops += Operation::ri(Opecode::IMUL, Register::RAX, -vars[inst->load->array.base]->array.elemSize, 8);
+                                ops += Operation::ri(Opecode::IMUL, Register::RAX, -static_cast<int32_t>(ir::sizeOfType(*inst->load->array.base->symbol.type.array.type)), 8);
                                 ops += Operation::ar(Opecode::SUB, Register::RSP, 8, Register::RAX, 8);
                                 ops += Operation::r(Opecode::POP, Register::RAX);
                                 ops += Operation::ra(Opecode::MOV, Register::RAX, Register::RAX, 8);
@@ -836,23 +835,22 @@ namespace pick::x86_64
                     if (inst->store->index) {
                         assert(exists(vars, inst->store->base));
                         assert(exists(vars, inst->store->index));
-                        assert(vars[inst->store->base]->type == VarType::Array);
                         switch (vars[inst->store->value]->type) {
                         case VarType::Register:
                             switch (vars[inst->store->index]->type) {
                             case VarType::Register:
                                 ops += Operation::rr(Opecode::MOV, Register::RAX, vars[inst->store->index]->reg, ir::sizeOfType(inst->store->index->symbol.type));
-                                ops += Operation::ri(Opecode::IMUL, Register::RAX, vars[inst->store->base]->array.elemSize, 8);
+                                ops += Operation::ri(Opecode::IMUL, Register::RAX, ir::sizeOfType(*inst->store->base->symbol.type.array.type), 8);
                                 ops += Operation::rr(Opecode::ADD, Register::RAX, Register::RBP, 8);
-                                ops += Operation::ri(Opecode::ADD, Register::RAX, vars[inst->store->base]->array.base, 8);
+                                ops += Operation::ri(Opecode::ADD, Register::RAX, vars[inst->store->base]->offset, 8);
                                 ops += Operation::ar(Opecode::MOV, Register::RAX, vars[inst->store->value]->reg, ir::sizeOfType(inst->store->value->symbol.type));
                                 break;
                             case VarType::Spill:
                             case VarType::Phi:
                                 ops += Operation::ra(Opecode::MOV, Register::RAX, Register::RBP, vars[inst->store->index]->offset, ir::sizeOfType(inst->store->index->symbol.type));
-                                ops += Operation::ri(Opecode::IMUL, Register::RAX, vars[inst->store->base]->array.elemSize, 8);
+                                ops += Operation::ri(Opecode::IMUL, Register::RAX, ir::sizeOfType(*inst->store->base->symbol.type.array.type), 8);
                                 ops += Operation::rr(Opecode::ADD, Register::RAX, Register::RBP, 8);
-                                ops += Operation::ri(Opecode::ADD, Register::RAX, vars[inst->store->base]->array.base, 8);
+                                ops += Operation::ri(Opecode::ADD, Register::RAX, vars[inst->store->base]->offset, 8);
                                 ops += Operation::ar(Opecode::MOV, Register::RAX, vars[inst->store->value]->reg, ir::sizeOfType(inst->store->value->symbol.type));
                                 break;
                             default:
@@ -864,18 +862,18 @@ namespace pick::x86_64
                             switch (vars[inst->store->index]->type) {
                             case VarType::Register:
                                 ops += Operation::rr(Opecode::MOV, Register::RAX, vars[inst->store->index]->reg, ir::sizeOfType(inst->store->index->symbol.type));
-                                ops += Operation::ri(Opecode::IMUL, Register::RAX, vars[inst->store->base]->array.elemSize, 8);
+                                ops += Operation::ri(Opecode::IMUL, Register::RAX, ir::sizeOfType(*inst->store->base->symbol.type.array.type), 8);
                                 ops += Operation::rr(Opecode::ADD, Register::RAX, Register::RBP, 8);
-                                ops += Operation::ri(Opecode::ADD, Register::RAX, vars[inst->store->base]->array.base, 8);
+                                ops += Operation::ri(Opecode::ADD, Register::RAX, vars[inst->store->base]->offset, 8);
                                 ops += Operation::ra(Opecode::MOV, Register::R10, Register::RBP, vars[inst->store->value]->offset, ir::sizeOfType(inst->store->value->symbol.type));
                                 ops += Operation::ar(Opecode::MOV, Register::RAX, Register::R10, ir::sizeOfType(inst->store->value->symbol.type));
                                 break;
                             case VarType::Spill:
                             case VarType::Phi:
                                 ops += Operation::ra(Opecode::MOV, Register::RAX, Register::RBP, vars[inst->store->index]->offset, ir::sizeOfType(inst->store->index->symbol.type));
-                                ops += Operation::ri(Opecode::IMUL, Register::RAX, vars[inst->store->base]->array.elemSize, 8);
+                                ops += Operation::ri(Opecode::IMUL, Register::RAX, ir::sizeOfType(*inst->store->base->symbol.type.array.type), 8);
                                 ops += Operation::rr(Opecode::ADD, Register::RAX, Register::RBP, 8);
-                                ops += Operation::ri(Opecode::ADD, Register::RAX, vars[inst->store->base]->array.base, 8);
+                                ops += Operation::ri(Opecode::ADD, Register::RAX, vars[inst->store->base]->offset, 8);
                                 ops += Operation::ra(Opecode::MOV, Register::R10, Register::RBP, vars[inst->store->value]->offset, ir::sizeOfType(inst->store->value->symbol.type));
                                 ops += Operation::ar(Opecode::MOV, Register::RAX, Register::R10, ir::sizeOfType(inst->store->value->symbol.type));
                                 break;
@@ -962,9 +960,8 @@ namespace pick::x86_64
                     assert(!exists(vars, inst->alloc->dist));
                     auto var = new Var{};
                     offset -= (inst->alloc->size + 7) / 8 * 8;
-                    var->type = VarType::Array;
-                    var->array.base = offset;
-                    var->array.elemSize = ir::sizeOfType(*inst->alloc->dist->symbol.type.array.type);
+                    var->type = VarType::Spill;
+                    var->offset = offset;
                     vars[inst->alloc->dist] = var;
                     offset -= 8;
                     break;
@@ -1020,9 +1017,9 @@ namespace pick::x86_64
                             case VarType::RuntimeSymbol:
                                 ops += Operation::ra(Opecode::MOV, reg, RMType::Runtime, vars[arg]->indexOfData, 8);
                                 break;
-                            case VarType::Array:
-                                ops += Operation::addressof(reg, vars[arg]->array.base);
-                                break;
+                          /*  case VarType::Array:
+                                ops += Operation::addressof(reg, vars[arg]->offset);
+                                break;*/
                             default:
                                 assert(false);
                             }
@@ -1474,7 +1471,9 @@ namespace pick::x86_64
             errors += "エラー: mainシンボルが見つかりませんでした。";
         }
         else {
-            x86_64.invokeMain.ops.back() += Operation::call(indexOfMainSymbol.value().indexOfData);
+            std::vector<Operation> op;
+            op += Operation::call(indexOfMainSymbol.value().indexOfData);
+            x86_64.invokeMain.ops += op;
             /*x86_64.invokeMain.relocs += Relocation{ x86_64.invokeMain.code.size() + 1, RelocationType::Function, indexOfMainSymbol.value().indexOfData };
             callA(invokeMainEpilogue, -1);*/
         }

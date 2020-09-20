@@ -966,18 +966,7 @@ namespace pick::ir
         }
         if (varDef->init) {
             auto res = nodeGenerate(varDef->init, blocks, regs, vars, table);
-            if (res) {
-                reg = new Register{};
-                reg->symbol = res.get()->symbol;
-                auto inst = new Instruction{};
-                inst->type = InstructionType::Store;
-                inst->store = new StoreInstruction{};
-                inst->store->base = reg;
-                inst->store->index = nullptr;
-                inst->store->value = res.get();
-                blocks.back()->insts += inst;
-                regs += reg;
-            }
+            if (res) reg = res.get();
             else errors += res.err();
         }
         vars[varDef->var->name] = reg;

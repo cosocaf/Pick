@@ -320,7 +320,6 @@ namespace pick::x86_64
         Register,
         Spill,
         Phi,
-        Array,
         ConstantSymbol,
         RuntimeSymbol,
         FunctionSymbol,
@@ -332,10 +331,6 @@ namespace pick::x86_64
         {
             x86_64::Register reg;
             int32_t offset;
-            struct {
-                int32_t base;
-                int32_t elemSize;
-            } array;
             size_t indexOfData;
         };
     };
