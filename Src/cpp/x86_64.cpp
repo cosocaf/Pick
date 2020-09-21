@@ -196,19 +196,19 @@ namespace pick::x86_64
             }*/
         };
 
-        auto binaryOp = [&](std::vector<Operation>& ops, Opecode opecode, const ir::Instruction* inst) {
+        auto binaryOp = [&](std::vector<Operation>& ops, Opecode opecode, const Instruction* inst) {
             assert(
-                inst->type == ir::InstructionType::Add ||
-                inst->type == ir::InstructionType::Sub ||
-                inst->type == ir::InstructionType::Mul ||
-                inst->type == ir::InstructionType::Div ||
-                inst->type == ir::InstructionType::Mod ||
-                inst->type == ir::InstructionType::Equal ||
-                inst->type == ir::InstructionType::NotEqual ||
-                inst->type == ir::InstructionType::GreaterEqual ||
-                inst->type == ir::InstructionType::GreaterThan ||
-                inst->type == ir::InstructionType::LessEqual ||
-                inst->type == ir::InstructionType::LessThan
+                inst->type == InstructionType::Add ||
+                inst->type == InstructionType::Sub ||
+                inst->type == InstructionType::Mul ||
+                inst->type == InstructionType::Div ||
+                inst->type == InstructionType::Mod ||
+                inst->type == InstructionType::Equal ||
+                inst->type == InstructionType::NotEqual ||
+                inst->type == InstructionType::GreaterEqual ||
+                inst->type == InstructionType::GreaterThan ||
+                inst->type == InstructionType::LessEqual ||
+                inst->type == InstructionType::LessThan
             );
             assert(exists(vars, inst->binary->left));
             assert(exists(vars, inst->binary->right));
@@ -217,12 +217,142 @@ namespace pick::x86_64
                 next = vars[inst->imm->dist];
                 assert(next->type == VarType::Phi);
             }
+            else if (vars[inst->binary->left]->type == VarType::Immediate && vars[inst->binary->right]->type == VarType::Immediate) {
+                next = new Var{};
+                next->type == VarType::Immediate;
+                vars[inst->imm->dist] = next;
+            }
             else {
                 next = nextReg(inst->imm->dist);
             }
+
             switch (vars[inst->binary->left]->type) {
+            case VarType::Immediate:
+                switch (vars[inst->binary->right]->type) {
+                case VarType::Immediate:
+                {
+                    int64_t imm;
+                    switch (inst->type) {
+                    case InstructionType::Add: imm = vars[inst->binary->left]->imm + vars[inst->binary->right]->imm; break;
+                    case InstructionType::Sub: imm = vars[inst->binary->left]->imm - vars[inst->binary->right]->imm; break;
+                    case InstructionType::Mul: imm = vars[inst->binary->left]->imm * vars[inst->binary->right]->imm; break;
+                    case InstructionType::Div: imm = vars[inst->binary->left]->imm / vars[inst->binary->right]->imm; break;
+                    case InstructionType::Mod: imm = vars[inst->binary->left]->imm % vars[inst->binary->right]->imm; break;
+                    case InstructionType::Equal: imm = (vars[inst->binary->left]->imm == vars[inst->binary->right]->imm); break;
+                    case InstructionType::NotEqual: imm = (vars[inst->binary->left]->imm != vars[inst->binary->right]->imm); break;
+                    case InstructionType::GreaterEqual: imm = (vars[inst->binary->left]->imm >= vars[inst->binary->right]->imm); break;
+                    case InstructionType::GreaterThan: imm = (vars[inst->binary->left]->imm > vars[inst->binary->right]->imm); break;
+                    case InstructionType::LessEqual: imm = (vars[inst->binary->left]->imm <= vars[inst->binary->right]->imm); break;
+                    case InstructionType::LessThan: imm = (vars[inst->binary->left]->imm < vars[inst->binary->right]->imm); break;
+                    default: assert(false);
+                    }
+                    switch (next->type) {
+                    case VarType::Immediate:
+                        assert(next->type == VarType::Immediate);
+                        next->imm = imm;
+                        break;
+                    case VarType::Register:
+                        ops += Operation::ri(Opecode::MOV, next->reg, imm, ir::sizeOfType(inst->imm->dist->symbol.type));
+                        break;
+                    case VarType::Spill:
+                    case VarType::Phi:
+                        ops += Operation::ai(Opecode::MOV, Register::RBP, next->offset, imm, ir::sizeOfType(inst->imm->dist->symbol.type));
+                        break;
+                    case VarType::RuntimeSymbol:
+                        ops += Operation::ai(Opecode::MOV, RMType::Runtime, next->indexOfData, imm, ir::sizeOfType(inst->imm->dist->symbol.type));
+                        break;
+                    default:
+                        assert(false);
+                    }
+                    break;
+                }
+                case VarType::Register:
+                    switch (next->type) {
+                    case VarType::Register:
+                        ops += Operation::ri(Opecode::MOV, next->reg, vars[inst->binary->left]->imm, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::rr(opecode, next->reg, vars[inst->binary->right]->reg, ir::sizeOfType(inst->binary->right->symbol.type));
+                        break;
+                    case VarType::Spill:
+                    case VarType::Phi:
+                        ops += Operation::ai(Opecode::MOV, Register::RBP, next->offset, vars[inst->binary->left]->imm, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::ar(opecode, Register::RBP, next->offset, vars[inst->binary->right]->reg, ir::sizeOfType(inst->binary->right->symbol.type));
+                        break;
+                    case VarType::RuntimeSymbol:
+                        ops += Operation::ai(Opecode::MOV, RMType::Runtime, next->indexOfData, vars[inst->binary->left]->imm, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::ar(opecode, RMType::Runtime, next->indexOfData, vars[inst->binary->right]->reg, ir::sizeOfType(inst->binary->right->symbol.type));
+                        break;
+                    default:
+                        assert(false);
+                    }
+                    break;
+                case VarType::Spill:
+                case VarType::Phi:
+                    switch (next->type) {
+                    case VarType::Register:
+                        ops += Operation::ri(Opecode::MOV, next->reg, vars[inst->binary->left]->imm, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::ra(opecode, next->reg, Register::RBP, vars[inst->binary->right]->offset, ir::sizeOfType(inst->binary->right->symbol.type));
+                        break;
+                    case VarType::Spill:
+                    case VarType::Phi:
+                        ops += Operation::ri(Opecode::MOV, Register::RAX, vars[inst->binary->left]->imm, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::ra(opecode, Register::RAX, Register::RBP, vars[inst->binary->right]->offset, ir::sizeOfType(inst->binary->right->symbol.type));
+                        ops += Operation::ar(Opecode::MOV, Register::RBP, next->offset, Register::RAX, ir::sizeOfType(inst->binary->dist->symbol.type));
+                        break;
+                    case VarType::RuntimeSymbol:
+                        ops += Operation::ri(Opecode::MOV, Register::RAX, vars[inst->binary->left]->imm, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::ra(opecode, Register::RAX, Register::RBP, vars[inst->binary->right]->offset, ir::sizeOfType(inst->binary->right->symbol.type));
+                        ops += Operation::ar(Opecode::MOV, RMType::Runtime, next->indexOfData, Register::RAX, ir::sizeOfType(inst->binary->left->symbol.type));
+                        break;
+                    default:
+                        assert(false);
+                    }
+                    break;
+                case VarType::RuntimeSymbol:
+                    switch (next->type) {
+                    case VarType::Register:
+                        ops += Operation::ri(Opecode::MOV, next->reg, vars[inst->binary->left]->imm, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::ra(opecode, next->reg, RMType::Runtime, vars[inst->binary->right]->indexOfData, ir::sizeOfType(inst->binary->right->symbol.type));
+                        break;
+                    case VarType::Spill:
+                    case VarType::Phi:
+                        ops += Operation::ri(Opecode::MOV, Register::RAX, vars[inst->binary->left]->imm, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::ra(opecode, Register::RAX, RMType::Runtime, vars[inst->binary->right]->indexOfData, ir::sizeOfType(inst->binary->right->symbol.type));
+                        ops += Operation::ar(Opecode::MOV, Register::RBP, next->offset, Register::RAX, ir::sizeOfType(inst->binary->dist->symbol.type));
+                        break;
+                    case VarType::RuntimeSymbol:
+                        ops += Operation::ri(Opecode::MOV, Register::RAX, vars[inst->binary->left]->imm, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::ra(opecode, Register::RAX, RMType::Runtime, vars[inst->binary->right]->indexOfData, ir::sizeOfType(inst->binary->right->symbol.type));
+                        ops += Operation::ar(Opecode::MOV, RMType::Runtime, next->indexOfData, Register::RAX, ir::sizeOfType(inst->binary->left->symbol.type));
+                        break;
+                    default:
+                        assert(false);
+                    }
+                    break;
+                default:
+                    assert(false);
+                }
+                break;
             case VarType::Register:
                 switch (vars[inst->binary->right]->type) {
+                case VarType::Immediate:
+                    switch (next->type) {
+                    case VarType::Register:
+                        ops += Operation::rr(Opecode::MOV, next->reg, vars[inst->binary->left]->reg, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::ri(opecode, next->reg, vars[inst->binary->right]->imm, ir::sizeOfType(inst->binary->right->symbol.type));
+                        break;
+                    case VarType::Spill:
+                    case VarType::Phi:
+                        ops += Operation::ar(Opecode::MOV, Register::RBP, next->offset, vars[inst->binary->left]->reg, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::ai(opecode, Register::RBP, next->offset, vars[inst->binary->right]->imm, ir::sizeOfType(inst->binary->right->symbol.type));
+                        break;
+                    case VarType::RuntimeSymbol:
+                        ops += Operation::ar(Opecode::MOV, RMType::Runtime, next->indexOfData, vars[inst->binary->left]->reg, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::ai(opecode, RMType::Runtime, next->indexOfData, vars[inst->binary->right]->imm, ir::sizeOfType(inst->binary->right->symbol.type));
+                        break;
+                    default:
+                        assert(false);
+                    }
+                    break;
                 case VarType::Register:
                     switch (next->type) {
                     case VarType::Register:
@@ -292,6 +422,27 @@ namespace pick::x86_64
             case VarType::Spill:
             case VarType::Phi:
                 switch (vars[inst->binary->right]->type) {
+                case VarType::Immediate:
+                    switch (next->type) {
+                    case VarType::Register:
+                        ops += Operation::ra(Opecode::MOV, next->reg, Register::RBP, vars[inst->binary->left]->offset, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::ri(opecode, next->reg, vars[inst->binary->right]->imm, ir::sizeOfType(inst->binary->right->symbol.type));
+                        break;
+                    case VarType::Spill:
+                    case VarType::Phi:
+                        ops += Operation::ra(Opecode::MOV, Register::RAX, Register::RBP, vars[inst->binary->left]->offset, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::ri(opecode, Register::RAX, vars[inst->binary->right]->imm, ir::sizeOfType(inst->binary->right->symbol.type));
+                        ops += Operation::ar(Opecode::MOV, Register::RBP, next->offset, Register::RAX, ir::sizeOfType(inst->binary->dist->symbol.type));
+                        break;
+                    case VarType::RuntimeSymbol:
+                        ops += Operation::ra(Opecode::MOV, Register::RAX, Register::RBP, vars[inst->binary->left]->offset, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::ri(opecode, Register::RAX, vars[inst->binary->right]->imm, ir::sizeOfType(inst->binary->right->symbol.type));
+                        ops += Operation::ar(Opecode::MOV, RMType::Runtime, next->indexOfData, Register::RAX, ir::sizeOfType(inst->binary->left->symbol.type));
+                        break;
+                    default:
+                        assert(false);
+                    }
+                    break;
                 case VarType::Register:
                     switch (next->type) {
                     case VarType::Register:
@@ -362,6 +513,27 @@ namespace pick::x86_64
                 break;
             case VarType::RuntimeSymbol:
                 switch (vars[inst->binary->right]->type) {
+                case VarType::Immediate:
+                    switch (next->type) {
+                    case VarType::Register:
+                        ops += Operation::ra(Opecode::MOV, next->reg, RMType::Runtime, vars[inst->binary->left]->indexOfData, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::ri(opecode, next->reg, vars[inst->binary->right]->imm, ir::sizeOfType(inst->binary->right->symbol.type));
+                        break;
+                    case VarType::Spill:
+                    case VarType::Phi:
+                        ops += Operation::ra(Opecode::MOV, Register::RAX, RMType::Runtime, vars[inst->binary->left]->indexOfData, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::ri(opecode, Register::RAX, vars[inst->binary->right]->imm, ir::sizeOfType(inst->binary->right->symbol.type));
+                        ops += Operation::ar(Opecode::MOV, Register::RBP, next->offset, Register::RAX, ir::sizeOfType(inst->binary->dist->symbol.type));
+                        break;
+                    case VarType::RuntimeSymbol:
+                        ops += Operation::ra(Opecode::MOV, Register::RAX, RMType::Runtime, vars[inst->binary->left]->indexOfData, ir::sizeOfType(inst->binary->left->symbol.type));
+                        ops += Operation::ri(opecode, Register::RAX, vars[inst->binary->right]->imm, ir::sizeOfType(inst->binary->right->symbol.type));
+                        ops += Operation::ar(Opecode::MOV, RMType::Runtime, next->indexOfData, Register::RAX, ir::sizeOfType(inst->binary->left->symbol.type));
+                        break;
+                    default:
+                        assert(false);
+                    }
+                    break;
                 case VarType::Register:
                     switch (next->type) {
                     case VarType::Register:
@@ -503,130 +675,58 @@ namespace pick::x86_64
                     if (exists(vars, inst->imm->dist)) {
                         next = vars[inst->imm->dist];
                         assert(next->type == VarType::Phi);
-                    }
-                    else {
-                        next = nextReg(inst->imm->dist);
-                    }
-                    switch (inst->imm->type) {
-                    case ImmType::I8:
-                        switch (next->type) {
-                        case VarType::Register:
-                            ops += Operation::ri(Opecode::MOV, next->reg, inst->imm->i8, 1);
-                            break;
-                        case VarType::Spill:
-                        case VarType::Phi:
+                        switch (inst->imm->type) {
+                        case ImmType::I8:
                             ops += Operation::ai(Opecode::MOV, Register::RBP, next->offset, inst->imm->i8, 1);
                             break;
-                        default:
-                            assert(false);
-                        }
-                        break;
-                    case ImmType::I16:
-                        switch (next->type) {
-                        case VarType::Register:
-                            ops += Operation::ri(Opecode::MOV, next->reg, inst->imm->i16, 2);
-                            break;
-                        case VarType::Spill:
-                        case VarType::Phi:
+                        case ImmType::I16:
                             ops += Operation::ai(Opecode::MOV, Register::RBP, next->offset, inst->imm->i16, 2);
                             break;
-                        default:
-                            assert(false);
-                        }
-                        break;
-                    case ImmType::I32:
-                        switch (next->type) {
-                        case VarType::Register:
-                            ops += Operation::ri(Opecode::MOV, next->reg, inst->imm->i32, 4);
+                        case ImmType::I32:
+                            ops += Operation::ai(Opecode::MOV, Register::RBP, next->offset, inst->imm->i32, 4);
                             break;
-                        case VarType::Spill:
-                        case VarType::Phi:
-                            ops += Operation::ai(Opecode::MOV, Register::RBP, next->offset, inst->imm->i32, 8);
-                            break;
-                        default:
-                            assert(false);
-                        }
-                        break;
-                    case ImmType::I64:
-                        switch (next->type) {
-                        case VarType::Register:
-                            ops += Operation::ri(Opecode::MOV, next->reg, inst->imm->i64, 8);
-                            break;
-                        case VarType::Spill:
-                        case VarType::Phi:
+                        case ImmType::I64:
                             ops += Operation::ai(Opecode::MOV, Register::RBP, next->offset, inst->imm->i64, 8);
                             break;
-                        default:
-                            assert(false);
-                        }
-                        break;
-                    case ImmType::U8:
-                        switch (next->type) {
-                        case VarType::Register:
-                            ops += Operation::ri(Opecode::MOV, next->reg, inst->imm->u8, 1);
-                            break;
-                        case VarType::Spill:
-                        case VarType::Phi:
+                        case ImmType::U8:
                             ops += Operation::ai(Opecode::MOV, Register::RBP, next->offset, inst->imm->u8, 1);
                             break;
-                        default:
-                            assert(false);
-                        }
-                        break;
-                    case ImmType::U16:
-                        switch (next->type) {
-                        case VarType::Register:
-                            ops += Operation::ri(Opecode::MOV, next->reg, inst->imm->u16, 2);
-                            break;
-                        case VarType::Spill:
-                        case VarType::Phi:
+                        case ImmType::U16:
                             ops += Operation::ai(Opecode::MOV, Register::RBP, next->offset, inst->imm->u16, 2);
                             break;
-                        default:
-                            assert(false);
-                        }
-                        break;
-                    case ImmType::U32:
-                        switch (next->type) {
-                        case VarType::Register:
-                            ops += Operation::ri(Opecode::MOV, next->reg, inst->imm->u32, 4);
+                        case ImmType::U32:
+                            ops += Operation::ai(Opecode::MOV, Register::RBP, next->offset, inst->imm->u32, 4);
                             break;
-                        case VarType::Spill:
-                        case VarType::Phi:
-                            ops += Operation::ai(Opecode::MOV, Register::RBP, next->offset, inst->imm->u32, 8);
-                            break;
-                        default:
-                            assert(false);
-                        }
-                        break;
-                    case ImmType::U64:
-                        switch (next->type) {
-                        case VarType::Register:
-                            ops += Operation::ri(Opecode::MOV, next->reg, inst->imm->u64, 8);
-                            break;
-                        case VarType::Spill:
-                        case VarType::Phi:
+                        case ImmType::U64:
                             ops += Operation::ai(Opecode::MOV, Register::RBP, next->offset, inst->imm->u64, 8);
                             break;
-                        default:
-                            assert(false);
-                        }
-                        break;
-                    case ImmType::Char:
-                        switch (next->type) {
-                        case VarType::Register:
-                            ops += Operation::ri(Opecode::MOV, next->reg, inst->imm->c, 1);
-                            break;
-                        case VarType::Spill:
-                        case VarType::Phi:
+                        case ImmType::Char:
                             ops += Operation::ai(Opecode::MOV, Register::RBP, next->offset, inst->imm->c, 1);
                             break;
+                        case ImmType::Bool:
+                            ops += Operation::ai(Opecode::MOV, Register::RBP, next->offset, inst->imm->b, 1);
+                            break;
                         default:
                             assert(false);
                         }
-                        break;
-                    default:
-                        assert(false);
+                    }
+                    else {
+                        next = new Var{};
+                        next->type = VarType::Immediate;
+                        switch (inst->imm->type) {
+                        case ImmType::I8: next->imm = inst->imm->i8; break;
+                        case ImmType::I16: next->imm = inst->imm->i16; break;
+                        case ImmType::I32: next->imm = inst->imm->i32; break;
+                        case ImmType::I64: next->imm = inst->imm->i64; break;
+                        case ImmType::U8: next->imm = inst->imm->u8; break;
+                        case ImmType::U16: next->imm = inst->imm->u16; break;
+                        case ImmType::U32: next->imm = inst->imm->u32; break;
+                        case ImmType::U64: next->imm = inst->imm->u64; break;
+                        case ImmType::Char: next->imm = inst->imm->c; break;
+                        case ImmType::Bool: next->imm = inst->imm->b; break;
+                        default: assert(false);
+                        }
+                        vars[inst->imm->dist] = next;
                     }
                     break;
                 }
@@ -1092,6 +1192,9 @@ namespace pick::x86_64
                 case InstructionType::Return:
                     assert(exists(vars, inst->ret->reg));
                     switch (vars[inst->ret->reg]->type) {
+                    case VarType::Immediate:
+                        ops += Operation::ri(Opecode::MOV, Register::RAX, vars[inst->ret->reg]->imm, ir::sizeOfType(inst->ret->reg->symbol.type));
+                        break;
                     case VarType::Register:
                         ops += Operation::rr(Opecode::MOV, Register::RAX, vars[inst->ret->reg]->reg, ir::sizeOfType(inst->ret->reg->symbol.type));
                         break;
@@ -3158,6 +3261,16 @@ namespace pick::x86_64
         op.op1.mem = Memory{};
         op.op1.mem.base = dist;
         op.imm = imm;
+        return op;
+    }
+    Operation Operation::ai(Opecode opecode, RMType type, uint64_t address, int32_t imm, size_t size)
+    {
+        Operation op{};
+        op.opecode = opecode;
+        op.op1.type = type;
+        op.op1.address = address;
+        op.imm = imm;
+        op.size = size;
         return op;
     }
     Operation Operation::ai(Opecode opecode, Register base, int32_t ref, int32_t imm, size_t size)

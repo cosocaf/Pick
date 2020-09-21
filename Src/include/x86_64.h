@@ -261,6 +261,7 @@ namespace pick::x86_64
         static Operation ar(Opecode opecode, Register base, int32_t ref, Register src, size_t size);
         static Operation ar(Opecode opecode, Register base, Register index, int scale, int32_t ref, Register src, size_t size);
         static Operation ai(Opecode opecode, Register dist, int32_t imm, size_t size);
+        static Operation ai(Opecode opecode, RMType type, uint64_t address, int32_t imm, size_t size);
         static Operation ai(Opecode opecode, Register base, int32_t ref, int32_t imm, size_t size);
         static Operation jcc(Opecode opecode, size_t indexOfBlock);
         static Operation call(size_t indexOfFunction);
@@ -317,6 +318,7 @@ namespace pick::x86_64
     };
     enum struct VarType
     {
+        Immediate,
         Register,
         Spill,
         Phi,
@@ -329,6 +331,7 @@ namespace pick::x86_64
         VarType type;
         union
         {
+            int64_t imm;
             x86_64::Register reg;
             int32_t offset;
             size_t indexOfData;

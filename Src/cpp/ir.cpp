@@ -718,12 +718,10 @@ namespace pick::ir
             inst->type = InstructionType::Load;
             inst->load = new LoadInstruction{};
             inst->load->type = LoadType::Array;
-            auto res = nodeGenerate(back->expr, blocks, regs, vars, table);
-            if (res) inst->load->array.base = res.get();
-            else errors += res.err();
-            res = nodeGenerate(back->suffix, blocks, regs, vars, table);
-            if (res) inst->load->array.suffix = res.get();
-            else errors += res.err();
+            inst->load->array.base = expr.get();
+            auto suffix = nodeGenerate(back->suffix, blocks, regs, vars, table);
+            if (suffix) inst->load->array.suffix = suffix.get();
+            else errors += suffix.err();
             reg->symbol.type = *inst->load->array.base->symbol.type.array.type;
             inst->load->dist = reg;
             break;
