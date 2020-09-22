@@ -317,32 +317,8 @@ namespace pick::exe
         auto res = resolveRelocations();
         if (!res) errors += res.err();
 
-        for (auto& reloc : x86_64.invokeMain.relocs) {
-            uint64_t address = 0;
-            switch (reloc.type) {
-            case x86_64::RelocationType::Function:
-                address = x86_64.routines[reloc.indexOfData].address - reloc.indexOfRoutine - 4 - (ntHeader.optionalHeader.imageBase + ntHeader.optionalHeader.addressOfEntryPoint);
-                break;
-            case x86_64::RelocationType::ConstantSymbol:
-                address = x86_64.constSymbols[reloc.indexOfData].address;
-                relocTextSection.base.sizeOfBlock += 2;
-                relocTextSection.rva.push_back(0x3000 | (reloc.indexOfRoutine & 0x0FFF));
-                break;
-            case x86_64::RelocationType::RuntimeSymbol:
-                address = x86_64.runtimeSymbols[reloc.indexOfData].address;
-                relocTextSection.base.sizeOfBlock += 2;
-                relocTextSection.rva.push_back(0x3000 | (reloc.indexOfRoutine & 0x0FFF));
-                break;
-            default:
-                assert(false);
-            }
-            x86_64.invokeMain.code[reloc.indexOfRoutine] = static_cast<uint8_t>(address);
-            x86_64.invokeMain.code[reloc.indexOfRoutine + 1] = static_cast<uint8_t>(address >> 8);
-            x86_64.invokeMain.code[reloc.indexOfRoutine + 2] = static_cast<uint8_t>(address >> 16);
-            x86_64.invokeMain.code[reloc.indexOfRoutine + 3] = static_cast<uint8_t>(address >> 24);
-        }
-        uint64_t base = x86_64.invokeMain.code.size();
-        for (auto& routine : x86_64.routines) {
+        uint64_t base = 0;
+        const auto relocation = [&](x86_64::Routine& routine) {
             for (auto& reloc : routine.relocs) {
                 uint64_t address = 0;
                 switch (reloc.type) {
@@ -365,14 +341,19 @@ namespace pick::exe
                 default:
                     assert(false);
                 }
+                address += reloc.offset;
                 routine.code[reloc.indexOfRoutine] = static_cast<uint8_t>(address);
                 routine.code[reloc.indexOfRoutine + 1] = static_cast<uint8_t>(address >> 8);
                 routine.code[reloc.indexOfRoutine + 2] = static_cast<uint8_t>(address >> 16);
                 routine.code[reloc.indexOfRoutine + 3] = static_cast<uint8_t>(address >> 24);
             }
             base += routine.code.size();
+        };
+        relocation(x86_64.invokeMain);
+        for (auto& routine : x86_64.routines) {
+            relocation(routine);
         }
-
+        
         relocSection.misc.virtualSize = relocTextSection.base.sizeOfBlock;
         relocSection.sizeOfRawData = alignment(relocSection.misc.virtualSize, ntHeader.optionalHeader.fileAlignment);
         if (x86_64.runtimeSymbols.empty()) {
