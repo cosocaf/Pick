@@ -71,6 +71,170 @@ namespace pick::ir
         {
             return !(a == b);
         }
+        std::optional<std::pair<Symbol, std::string>> findSymbol(SymbolTable* cur, const syntax::Variable* curName)
+        {
+            std::string name = cur->name + "::";
+            auto parent = cur->parentSymbolTable;
+            while (parent) {
+                name.insert(0, parent->name + "::");
+                parent = parent->parentSymbolTable;
+            }
+            while (true) {
+                if (curName->scope) {
+                    if (exists(cur->subSymbolTable, curName->name)) {
+                        name += curName->name + "::";
+                        cur = cur->subSymbolTable[curName->name];
+                        curName = curName->scope;
+                    }
+                    else {
+                        return std::nullopt;
+                    }
+                }
+                else {
+                    if (exists(cur->symbols, curName->name)) {
+                        return std::make_pair(cur->symbols[curName->name], name + curName->name);
+                    }
+                    else {
+                        return std::nullopt;
+                    }
+                }
+            }
+        }
+        std::optional<std::pair<Symbol, std::string>> findSymbol(SymbolTable* table, const syntax::Variable* var, const IntermediateRepresentation& ir)
+        {
+            // 自分の子モジュールから検索
+            auto symbol = findSymbol(table, var);
+            // 自分の兄弟モジュールから検索
+            if (!symbol) {
+                if (table->parentSymbolTable) {
+                    symbol = findSymbol(table->parentSymbolTable, var);
+                }
+            }
+            // ルートモジュールから検索
+            if (!symbol) {
+                symbol = findSymbol(ir.rootSymbolTable, var);
+            }
+            return symbol;
+        }
+        void calcLifeTime(Function* fn)
+        {
+            std::unordered_set<Register*> vars;
+            for (const auto& arg : fn->args) {
+                vars.insert(arg);
+            }
+            size_t lifeTime = 0;
+            for (auto& block : fn->blocks) {
+                for (auto& inst : block->insts) {
+                    switch (inst->type) {
+                    case InstructionType::Add:
+                    case InstructionType::Sub:
+                    case InstructionType::Mul:
+                    case InstructionType::Div:
+                    case InstructionType::Mod:
+                    case InstructionType::Equal:
+                    case InstructionType::NotEqual:
+                    case InstructionType::GreaterEqual:
+                    case InstructionType::GreaterThan:
+                    case InstructionType::LessEqual:
+                    case InstructionType::LessThan:
+                        assert(vars.find(inst->binary->dist) == vars.end());
+                        assert(vars.find(inst->binary->left) != vars.end());
+                        assert(vars.find(inst->binary->right) != vars.end());
+                        inst->binary->dist->lifeBegin = inst->binary->dist->lifeEnd = lifeTime;
+                        vars.insert(inst->binary->dist);
+                        inst->binary->left->lifeEnd = lifeTime;
+                        inst->binary->right->lifeEnd = lifeTime;
+                        break;
+                    case InstructionType::Neg:
+                        if (vars.find(inst->neg->dist) == vars.end()) {
+                            inst->neg->dist->lifeBegin = inst->neg->dist->lifeEnd = lifeTime;
+                            vars.insert(inst->neg->dist);
+                        }
+                        else {
+                            inst->neg->dist->lifeEnd = lifeTime;
+                        }
+                        assert(vars.find(inst->neg->src) != vars.end());
+                        inst->neg->src->lifeEnd = lifeTime;
+                        break;
+                    case InstructionType::Imm:
+                        if (vars.find(inst->imm->dist) == vars.end()) {
+                            inst->imm->dist->lifeBegin = inst->imm->dist->lifeEnd = lifeTime;
+                            vars.insert(inst->imm->dist);
+                        }
+                        else {
+                            inst->imm->dist->lifeEnd = lifeTime;
+                        }
+                        break;
+                    case InstructionType::Load:
+                        if (vars.find(inst->load->dist) == vars.end()) {
+                            inst->load->dist->lifeBegin = inst->load->dist->lifeEnd = lifeTime;
+                            vars.insert(inst->load->dist);
+                        }
+                        else {
+                            inst->load->dist->lifeEnd = lifeTime;
+                        }
+                        if (inst->load->type == LoadType::Array) {
+                            assert(vars.find(inst->load->array.base) != vars.end());
+                            assert(vars.find(inst->load->array.suffix) != vars.end());
+                            inst->load->array.base->lifeEnd = lifeTime;
+                            inst->load->array.suffix->lifeEnd = lifeTime;
+                        }
+                        break;
+                    case InstructionType::Store:
+                        assert(vars.find(inst->store->value) != vars.end());
+                        if (inst->store->base) {
+                            if (vars.find(inst->store->base) == vars.end()) {
+                                inst->store->base->lifeBegin = inst->store->base->lifeEnd = lifeTime;
+                                vars.insert(inst->store->base);
+                            }
+                            inst->store->base->lifeEnd = lifeTime;
+                        }
+                        inst->store->value->lifeEnd = lifeTime;
+                        if (inst->store->index) {
+                            assert(vars.find(inst->store->index) != vars.end());
+                            inst->store->index->lifeEnd = lifeTime;
+                        }
+                        break;
+                    case InstructionType::Alloc:
+                        assert(vars.find(inst->alloc->dist) == vars.end());
+                        inst->alloc->dist->lifeBegin = inst->alloc->dist->lifeEnd = lifeTime;
+                        vars.insert(inst->alloc->dist);
+                        break;
+                    case InstructionType::Br:
+                        assert(vars.find(inst->br->cond) != vars.end());
+                        inst->br->cond->lifeEnd = lifeTime;
+                        break;
+                    case InstructionType::Jmp:
+                        break;
+                    case InstructionType::Phi:
+                        assert(vars.find(inst->phi->dist) == vars.end());
+                        inst->phi->dist->lifeBegin = inst->phi->dist->lifeEnd = lifeTime;
+                        vars.insert(inst->phi->dist);
+                        break;
+                    case InstructionType::Call:
+                        assert(vars.find(inst->call->dist) == vars.end());
+                        assert(vars.find(inst->call->fn) != vars.end());
+                        inst->call->dist->lifeBegin = inst->call->dist->lifeEnd = lifeTime;
+                        inst->call->fn->lifeEnd = lifeTime;
+                        for (auto& arg : inst->call->args) {
+                            assert(vars.find(arg) != vars.end());
+                            arg->lifeEnd = lifeTime;
+                        }
+                        vars.insert(inst->call->dist);
+                        break;
+                    case InstructionType::Return:
+                        if (inst->ret->reg) {
+                            assert(vars.find(inst->ret->reg) != vars.end());
+                            inst->ret->reg->lifeEnd = lifeTime;
+                        }
+                        break;
+                    default:
+                        assert(false);
+                    }
+                    ++lifeTime;
+                }
+            }
+        }
     }
     size_t sizeOfType(const Type& type)
     {
@@ -314,46 +478,7 @@ namespace pick::ir
 
         // グローバル変数
         if (!exists(vars, var->name)) {
-            auto findSymbol = [](SymbolTable* cur, const syntax::Variable* curName) -> std::optional<std::pair<Symbol, std::string>> {
-                std::string name = cur->name + "::";
-                auto parent = cur->parentSymbolTable;
-                while (parent) {
-                    name.insert(0, parent->name + "::");
-                    parent = parent->parentSymbolTable;
-                }
-                while (true) {
-                    if (curName->scope) {
-                        if (exists(cur->subSymbolTable, curName->name)) {
-                            name += curName->name + "::";
-                            cur = cur->subSymbolTable[curName->name];
-                            curName = curName->scope;
-                        }
-                        else {
-                            return std::nullopt;
-                        }
-                    }
-                    else {
-                        if (exists(cur->symbols, curName->name)) {
-                            return std::make_pair(cur->symbols[curName->name], name + curName->name);
-                        }
-                        else {
-                            return std::nullopt;
-                        }
-                    }
-                }
-            };
-            // 自分の子モジュールから検索
-            auto symbol = findSymbol(table, var);
-            // 自分の兄弟モジュールから検索
-            if (!symbol) {
-                if (table->parentSymbolTable) {
-                    symbol = findSymbol(table->parentSymbolTable, var);
-                }
-            }
-            // ルートモジュールから検索
-            if (!symbol) {
-                symbol = findSymbol(ir.rootSymbolTable, var);
-            }
+            auto symbol = findSymbol(table, var, ir);
             if (!symbol) {
                 std::stringstream ss;
                 ss << "エラー: 変数 " << var->name;
@@ -593,12 +718,10 @@ namespace pick::ir
             inst->type = InstructionType::Load;
             inst->load = new LoadInstruction{};
             inst->load->type = LoadType::Array;
-            auto res = nodeGenerate(back->expr, blocks, regs, vars, table);
-            if (res) inst->load->array.base = res.get();
-            else errors += res.err();
-            res = nodeGenerate(back->suffix, blocks, regs, vars, table);
-            if (res) inst->load->array.suffix = res.get();
-            else errors += res.err();
+            inst->load->array.base = expr.get();
+            auto suffix = nodeGenerate(back->suffix, blocks, regs, vars, table);
+            if (suffix) inst->load->array.suffix = suffix.get();
+            else errors += suffix.err();
             reg->symbol.type = *inst->load->array.base->symbol.type.array.type;
             inst->load->dist = reg;
             break;
@@ -841,18 +964,7 @@ namespace pick::ir
         }
         if (varDef->init) {
             auto res = nodeGenerate(varDef->init, blocks, regs, vars, table);
-            if (res) {
-                reg = new Register{};
-                reg->symbol = res.get()->symbol;
-                auto inst = new Instruction{};
-                inst->type = InstructionType::Store;
-                inst->store = new StoreInstruction{};
-                inst->store->base = reg;
-                inst->store->index = nullptr;
-                inst->store->value = res.get();
-                blocks.back()->insts += inst;
-                regs += reg;
-            }
+            if (res) reg = res.get();
             else errors += res.err();
         }
         vars[varDef->var->name] = reg;
@@ -913,14 +1025,12 @@ namespace pick::ir
         auto fn = new Function{};
         fn->symbolTable = symbolTable;
         fn->blocks += new InstructionBlock{};
-        std::vector<Register*> args;
         for (const auto& arg : fnDef->args) {
             assert(arg->var->scope == nullptr);
             auto reg = new Register{};
             reg->symbol.type = syntaxTypeToIrType(arg->type);
-            args += reg;
-            fn->blocks.back()->insts;
             fn->args += reg;
+            fn->blocks.back()->insts;
             fn->regs += reg;
             fn->vars[arg->var->name] = reg;
         }
@@ -935,121 +1045,43 @@ namespace pick::ir
             fn->blocks.back()->insts += inst;
         }
         ir.functions += fn;
-        std::unordered_set<Register*> vars;
-        for (const auto& arg : args) {
-            vars.insert(arg);
-        }
-        size_t lifeTime = 0;
-        for (auto& block : fn->blocks) {
-            for (auto& inst : block->insts) {
-                switch (inst->type) {
-                case InstructionType::Add:
-                case InstructionType::Sub:
-                case InstructionType::Mul:
-                case InstructionType::Div:
-                case InstructionType::Mod:
-                case InstructionType::Equal:
-                case InstructionType::NotEqual:
-                case InstructionType::GreaterEqual:
-                case InstructionType::GreaterThan:
-                case InstructionType::LessEqual:
-                case InstructionType::LessThan:
-                    assert(vars.find(inst->binary->dist) == vars.end());
-                    assert(vars.find(inst->binary->left) != vars.end());
-                    assert(vars.find(inst->binary->right) != vars.end());
-                    inst->binary->dist->lifeBegin = inst->binary->dist->lifeEnd = lifeTime;
-                    vars.insert(inst->binary->dist);
-                    inst->binary->left->lifeEnd = lifeTime;
-                    inst->binary->right->lifeEnd = lifeTime;
-                    break;
-                case InstructionType::Neg:
-                    if (vars.find(inst->neg->dist) == vars.end()) {
-                        inst->neg->dist->lifeBegin = inst->neg->dist->lifeEnd = lifeTime;
-                        vars.insert(inst->neg->dist);
-                    }
-                    else {
-                        inst->neg->dist->lifeEnd = lifeTime;
-                    }
-                    assert(vars.find(inst->neg->src) != vars.end());
-                    inst->neg->src->lifeEnd = lifeTime;
-                    break;
-                case InstructionType::Imm:
-                    if (vars.find(inst->imm->dist) == vars.end()) {
-                        inst->imm->dist->lifeBegin = inst->imm->dist->lifeEnd = lifeTime;
-                        vars.insert(inst->imm->dist);
-                    }
-                    else {
-                        inst->imm->dist->lifeEnd = lifeTime;
-                    }
-                    break;
-                case InstructionType::Load:
-                    if (vars.find(inst->load->dist) == vars.end()) {
-                        inst->load->dist->lifeBegin = inst->load->dist->lifeEnd = lifeTime;
-                        vars.insert(inst->load->dist);
-                    }
-                    else {
-                        inst->load->dist->lifeEnd = lifeTime;
-                    }
-                    if (inst->load->type == LoadType::Array) {
-                        assert(vars.find(inst->load->array.base) != vars.end());
-                        assert(vars.find(inst->load->array.suffix) != vars.end());
-                        inst->load->array.base->lifeEnd = lifeTime;
-                        inst->load->array.suffix->lifeEnd = lifeTime;
-                    }
-                    break;
-                case InstructionType::Store:
-                    assert(vars.find(inst->store->value) != vars.end());
-                    if (vars.find(inst->store->base) == vars.end()) {
-                        inst->store->base->lifeBegin = inst->store->base->lifeEnd = lifeTime;
-                        vars.insert(inst->store->base);
-                    }
-                    inst->store->base->lifeEnd = lifeTime;
-                    inst->store->value->lifeEnd = lifeTime;
-                    if (inst->store->index) {
-                        assert(vars.find(inst->store->index) != vars.end());
-                        inst->store->index->lifeEnd = lifeTime;
-                    }
-                    break;
-                case InstructionType::Alloc:
-                    assert(vars.find(inst->alloc->dist) == vars.end());
-                    inst->alloc->dist->lifeBegin = inst->alloc->dist->lifeEnd = lifeTime;
-                    vars.insert(inst->alloc->dist);
-                    break;
-                case InstructionType::Br:
-                    assert(vars.find(inst->br->cond) != vars.end());
-                    inst->br->cond->lifeEnd = lifeTime;
-                    break;
-                case InstructionType::Jmp:
-                    break;
-                case InstructionType::Phi:
-                    assert(vars.find(inst->phi->dist) == vars.end());
-                    inst->phi->dist->lifeBegin = inst->phi->dist->lifeEnd = lifeTime;
-                    vars.insert(inst->phi->dist);
-                    break;
-                case InstructionType::Call:
-                    assert(vars.find(inst->call->dist) == vars.end());
-                    assert(vars.find(inst->call->fn) != vars.end());
-                    inst->call->dist->lifeBegin = inst->call->dist->lifeEnd = lifeTime;
-                    inst->call->fn->lifeEnd = lifeTime;
-                    for (auto& arg : inst->call->args) {
-                        assert(vars.find(arg) != vars.end());
-                        arg->lifeEnd = lifeTime;
-                    }
-                    vars.insert(inst->call->dist);
-                    break;
-                case InstructionType::Return:
-                    if (inst->ret->reg) {
-                        assert(vars.find(inst->ret->reg) != vars.end());
-                        inst->ret->reg->lifeEnd = lifeTime;
-                    }
-                    break;
-                default:
-                    assert(false);
+        calcLifeTime(fn);
+        if (errors.empty()) return ok(fn);
+        else return error(errors);
+    }
+    Result<Function*, std::vector<std::string>> IR::globalVarDefGenerate(Symbol& symbol, SymbolTable* symbolTable)
+    {
+        std::vector<std::string> errors;
+        symbol.init = new Function{};
+        symbol.init->symbolTable = symbolTable;
+        symbol.init->blocks += new InstructionBlock{};
+        auto res = nodeGenerate(symbol.syntax->varDef->init, symbol.init->blocks, symbol.init->regs, symbol.init->vars, symbol.init->symbolTable);
+        if (res) {
+            auto global = findSymbol(symbolTable, symbol.syntax->varDef->var, ir);
+            if (!global) {
+                std::stringstream ss;
+                ss << "エラー: 変数 " << symbol.syntax->varDef->var->name;
+                auto cur = symbol.syntax->varDef->var->scope;
+                while (cur->scope) {
+                    ss << "::" << cur->name;
+                    cur = cur->scope;
                 }
-                ++lifeTime;
+                ss << " が見つかりません。";
+                errors += ss.str();
+            }
+            else {
+                auto inst = new Instruction{};
+                inst->type = InstructionType::Store;
+                inst->store = new StoreInstruction{};
+                inst->store->value = res.get();
+                inst->store->globalVar = global.value().second;
+                symbol.init->blocks.back()->insts += inst;
+                symbol.type = res.get()->symbol.type;
             }
         }
-        if (errors.empty()) return ok(fn);
+        else errors += res.err();
+        calcLifeTime(symbol.init);
+        if (errors.empty()) return ok(symbol.init);
         else return error(errors);
     }
     Result<_, std::vector<std::string>> IR::generate(SymbolTable* table)
@@ -1059,9 +1091,12 @@ namespace pick::ir
         for(auto& symbol : table->symbols) {
             switch (symbol.second.type.type) {
             case Types::Undefine:
+            {
                 assert(symbol.second.syntax->kind == NodeKind::VariableDefine);
-                assert(false);
+                auto res = globalVarDefGenerate(symbol.second, table);
+                if (!res) errors += res.err();
                 break;
+            }
             case Types::Function:
                 if (symbol.second.syntax->kind == NodeKind::FunctionDefine) {
                     if (symbol.second.syntax->fnDef->name == nullptr) {

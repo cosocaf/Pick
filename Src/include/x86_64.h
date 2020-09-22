@@ -174,6 +174,7 @@ namespace pick::x86_64
     {
         uint64_t indexOfRoutine;  // ルーチンコード内の再配置情報のある場所のオフセット
         RelocationType type;
+        int32_t offset;           // 配列や構造体の要素へのアクセスなどのベースアドレス＋オフセットアドレスが必要であれば使用する
         uint64_t indexOfData;     // X86_64内のそれぞれのインデックス
         std::string ext;          // type == Extern
     };
@@ -181,7 +182,6 @@ namespace pick::x86_64
     enum struct Opecode
     {
         _NONE,
-        ADDRESS_OF,
         ADD,
         OR,
         ADC,
@@ -218,6 +218,7 @@ namespace pick::x86_64
     {
         Register,
         Memory,
+        Address,
         Constant,
         Runtime,
     };
@@ -241,14 +242,8 @@ namespace pick::x86_64
     struct Operation
     {
         Opecode opecode;
-        /*
-            binary: オペランドのバイト数
-            jcc: ジャンプ先のブロックインデックス
-            call: コール先の関数のインデックス
-            fjmp: ジャンプ先の関数のインデックス
-            addressof: オペランドの相対参照値
-        */
-        size_t size;
+        size_t size;        // オペランドのバイト数
+        int32_t offset;      // 配列や構造体の要素へのアクセスなどで使用
         RM op1;
         std::optional<RM> op2;
         std::optional<int32_t> imm;
@@ -258,24 +253,25 @@ namespace pick::x86_64
         static Operation i(Opecode opecode, int32_t imm);
         static Operation rr(Opecode opecode, Register dist, Register src, size_t size);
         static Operation ra(Opecode opecode, Register dist, Register src, size_t size);
-        static Operation ra(Opecode opecode, Register dist, RMType type, uint64_t address, size_t size);
+        static Operation ra(Opecode opecode, Register dist, RMType type, uint64_t address, int32_t offset, size_t size);
         static Operation ra(Opecode opecode, Register dist, Register base, int32_t ref, size_t size);
         static Operation ra(Opecode opecode, Register dist, Register base, Register index, int scale, int32_t ref, size_t size);
         static Operation ri(Opecode opecode, Register dist, int32_t imm, size_t size);
         static Operation ar(Opecode opecode, Register dist, Register src, size_t size);
+        static Operation ar(Opecode opecode, RMType type, uint64_t address, int32_t offset, Register src, size_t size);
         static Operation ar(Opecode opecode, Register base, int32_t ref, Register src, size_t size);
         static Operation ar(Opecode opecode, Register base, Register index, int scale, int32_t ref, Register src, size_t size);
         static Operation ai(Opecode opecode, Register dist, int32_t imm, size_t size);
+        static Operation ai(Opecode opecode, RMType type, uint64_t address, int32_t offset, int32_t imm, size_t size);
         static Operation ai(Opecode opecode, Register base, int32_t ref, int32_t imm, size_t size);
         static Operation jcc(Opecode opecode, size_t indexOfBlock);
         static Operation call(size_t indexOfFunction);
-        static Operation addressof(Register dist, int32_t ref);
         static Operation ret();
     };
     struct Routine
     {
         uint64_t address;   // リンカで使用する。
-        std::vector<std::vector<Operation>> ops;
+        std::vector<std::vector<Operation>> ops;    // irのブロック区切りの命令列挙
         std::vector<uint8_t> code;
         std::vector<Relocation> relocs;
     };
@@ -320,10 +316,48 @@ namespace pick::x86_64
         std::vector<ConstantSymbol> constSymbols;
         std::vector<RuntimeSymbol> runtimeSymbols;
     };
+    enum struct VarType
+    {
+        Immediate,
+        Register,
+        Spill,
+        Phi,
+        ConstantSymbol,
+        RuntimeSymbol,
+        FunctionSymbol,
+    };
+    struct Var
+    {
+        VarType type;
+        union
+        {
+            int64_t imm;
+            x86_64::Register reg;
+            int32_t offset;
+            size_t indexOfData;
+        };
+    };
+    struct RegState
+    {
+        Var* inUse = nullptr;
+        bool hasBeenUsed = false;
+    };
+    enum struct Cond
+    {
+        Undef,
+        Equal,
+        NotEqual,
+        GreaterEqual,
+        GreaterThan,
+        LessEqual,
+        LessThan
+    };
     class X86_64Compiler
     {
         ir::IntermediateRepresentation ir;
         X86_64 x86_64;
+        Result<std::vector<std::vector<Operation>>, std::vector<std::string>> commonCompileRoutine(const ir::Function* fn, std::unordered_map<x86_64::Register, RegState>& regs, int32_t& offset);
+        Result<_, std::vector<std::string>> compileOperation(Routine& routine, int32_t len, const std::vector<uint8_t>& prologue, const std::vector<uint8_t>& epilogue);
         Result<Routine, std::vector<std::string>> compileRoutine(const ir::Function* fn);
     public:
         X86_64Compiler(const ir::IntermediateRepresentation& ir);
@@ -345,98 +379,94 @@ namespace pick::x86_64
 
     void addRR(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
     void addRA(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
-    void addRA(std::vector<uint8_t>& code, Register dist, uint32_t address, size_t size);
+    std::vector<size_t> addRA(std::vector<uint8_t>& code, Register dist, uint32_t address, size_t size);
     void addRA(std::vector<uint8_t>& code, Register dist, Register base, int32_t ref, size_t size);
     void addRA(std::vector<uint8_t>& code, Register dist, Register base, Register index, int scale, int32_t ref, size_t size);
     // 即値演算は32bitまで。64bitは一度即値をmovしてから計算。
     void addRI(std::vector<uint8_t>& code, Register dist, int32_t imm, size_t size);
     void addAR(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
-    void addAR(std::vector<uint8_t>& code, uint32_t address, Register src, size_t size);
+    std::vector<size_t> addAR(std::vector<uint8_t>& code, uint32_t address, Register src, size_t size);
     void addAR(std::vector<uint8_t>& code, Register base, int32_t ref, Register src, size_t size);
     void addAR(std::vector<uint8_t>& code, Register base, Register index, int scale, int32_t ref, Register src, size_t size);
     void addAI(std::vector<uint8_t>& code, Register dist, int32_t imm, size_t size);
-    void addAI(std::vector<uint8_t>& code, uint32_t address, int32_t imm, size_t size);
+    std::vector<size_t> addAI(std::vector<uint8_t>& code, uint32_t address, int32_t imm, size_t size);
     void addAI(std::vector<uint8_t>& code, Register base, int32_t ref, int32_t imm, size_t size);
 
     void subRR(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
     void subRA(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
-    void subRA(std::vector<uint8_t>& code, Register dist, uint32_t address, size_t size);
+    std::vector<size_t> subRA(std::vector<uint8_t>& code, Register dist, uint32_t address, size_t size);
     void subRA(std::vector<uint8_t>& code, Register dist, Register base, int32_t ref, size_t size);
     void subRA(std::vector<uint8_t>& code, Register dist, Register base, Register index, int scale, int32_t ref, size_t size);
     void subRI(std::vector<uint8_t>& code, Register dist, int32_t imm, size_t size);
     void subAR(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
-    void subAR(std::vector<uint8_t>& code, uint32_t address, Register src, size_t size);
+    std::vector<size_t> subAR(std::vector<uint8_t>& code, uint32_t address, Register src, size_t size);
     void subAR(std::vector<uint8_t>& code, Register base, int32_t ref, Register src, size_t size);
     void subAR(std::vector<uint8_t>& code, Register base, Register index, int scale, int32_t ref, Register src, size_t size);
     void subAI(std::vector<uint8_t>& code, Register dist, int32_t imm, size_t size);
-    void subAI(std::vector<uint8_t>& code, uint32_t address, int32_t imm, size_t size);
+    std::vector<size_t> subAI(std::vector<uint8_t>& code, uint32_t address, int32_t imm, size_t size);
     void subAI(std::vector<uint8_t>& code, Register base, int32_t ref, int32_t imm, size_t size);
-
-    void mulR(std::vector<uint8_t>& code, Register src);
-    void mulA(std::vector<uint8_t>& code, uint32_t address);
-    void mulA(std::vector<uint8_t>& code, Register base, uint32_t ref);
 
     void imulRR(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
     void imulRA(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
-    void imulRA(std::vector<uint8_t>& code, Register dist, uint32_t address, size_t size);
+    std::vector<size_t> imulRA(std::vector<uint8_t>& code, Register dist, uint32_t address, size_t size);
     void imulRA(std::vector<uint8_t>& code, Register dist, Register base, int32_t ref, size_t size);
     void imulRI(std::vector<uint8_t>& code, Register dist, int32_t imm, size_t size);
     void imulAR(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
-    void imulAR(std::vector<uint8_t>& code, uint32_t address, Register src, size_t size);
+    std::vector<size_t> imulAR(std::vector<uint8_t>& code, uint32_t address, Register src, size_t size);
     void imulAR(std::vector<uint8_t>& code, Register base, int32_t ref, Register src, size_t size);
     void imulAI(std::vector<uint8_t>& code, Register dist, int32_t imm, size_t size);
-    void imulAI(std::vector<uint8_t>& code, uint32_t address, int32_t imm, size_t size);
+    std::vector<size_t> imulAI(std::vector<uint8_t>& code, uint32_t address, int32_t imm, size_t size);
     void imulAI(std::vector<uint8_t>& code, Register base, int32_t ref, int32_t imm, size_t size);
 
     void idivRR(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
     void idivRA(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
-    void idivRA(std::vector<uint8_t>& code, Register dist, uint32_t address, size_t size);
+    std::vector<size_t> idivRA(std::vector<uint8_t>& code, Register dist, uint32_t address, size_t size);
     void idivRA(std::vector<uint8_t>& code, Register dist, Register base, int32_t ref, size_t size);
     void idivRI(std::vector<uint8_t>& code, Register dist, int32_t imm, size_t size);
     void idivAR(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
-    void idivAR(std::vector<uint8_t>& code, uint32_t address, Register src, size_t size);
+    std::vector<size_t> idivAR(std::vector<uint8_t>& code, uint32_t address, Register src, size_t size);
     void idivAR(std::vector<uint8_t>& code, Register base, int32_t ref, Register src, size_t size);
     void idivAI(std::vector<uint8_t>& code, Register dist, int32_t imm, size_t size);
-    void idivAI(std::vector<uint8_t>& code, uint32_t address, int32_t imm, size_t size);
+    std::vector<size_t> idivAI(std::vector<uint8_t>& code, uint32_t address, int32_t imm, size_t size);
     void idivAI(std::vector<uint8_t>& code, Register base, int32_t ref, int32_t imm, size_t size);
 
     void imodRR(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
     void imodRA(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
-    void imodRA(std::vector<uint8_t>& code, Register dist, uint32_t address, size_t size);
+    std::vector<size_t> imodRA(std::vector<uint8_t>& code, Register dist, uint32_t address, size_t size);
     void imodRA(std::vector<uint8_t>& code, Register dist, Register base, int32_t ref, size_t size);
     void imodRI(std::vector<uint8_t>& code, Register dist, int32_t imm, size_t size);
     void imodAR(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
-    void imodAR(std::vector<uint8_t>& code, uint32_t address, Register src, size_t size);
+    std::vector<size_t> imodAR(std::vector<uint8_t>& code, uint32_t address, Register src, size_t size);
     void imodAR(std::vector<uint8_t>& code, Register base, int32_t ref, Register src, size_t size);
     void imodAI(std::vector<uint8_t>& code, Register dist, int32_t imm, size_t size);
-    void imodAI(std::vector<uint8_t>& code, uint32_t address, int32_t imm, size_t size);
+    std::vector<size_t> imodAI(std::vector<uint8_t>& code, uint32_t address, int32_t imm, size_t size);
     void imodAI(std::vector<uint8_t>& code, Register base, int32_t ref, int32_t imm, size_t size);
 
     void cmpRR(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
     void cmpRA(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
-    void cmpRA(std::vector<uint8_t>& code, Register dist, uint32_t address, size_t size);
+    std::vector<size_t> cmpRA(std::vector<uint8_t>& code, Register dist, uint32_t address, size_t size);
     void cmpRA(std::vector<uint8_t>& code, Register dist, Register base, int32_t ref, size_t size);
     void cmpRA(std::vector<uint8_t>& code, Register dist, Register base, Register index, int scale, int32_t ref, size_t size);
     void cmpRI(std::vector<uint8_t>& code, Register dist, int32_t imm, size_t size);
     void cmpAR(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
-    void cmpAR(std::vector<uint8_t>& code, uint32_t address, Register src, size_t size);
+    std::vector<size_t> cmpAR(std::vector<uint8_t>& code, uint32_t address, Register src, size_t size);
     void cmpAR(std::vector<uint8_t>& code, Register base, int32_t ref, Register src, size_t size);
     void cmpAR(std::vector<uint8_t>& code, Register base, Register index, int scale, int32_t ref, Register src, size_t size);
     void cmpAI(std::vector<uint8_t>& code, Register dist, int32_t imm, size_t size);
-    void cmpAI(std::vector<uint8_t>& code, uint32_t address, int32_t imm, size_t size);
+    std::vector<size_t> cmpAI(std::vector<uint8_t>& code, uint32_t address, int32_t imm, size_t size);
     void cmpAI(std::vector<uint8_t>& code, Register base, int32_t ref, int32_t imm, size_t size);
 
     void movRR(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
     void movRA(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
-    void movRA(std::vector<uint8_t>& code, Register dist, uint32_t address, size_t size);
+    std::vector<size_t> movRA(std::vector<uint8_t>& code, Register dist, uint32_t address, size_t size);
     void movRA(std::vector<uint8_t>& code, Register dist, Register base, int32_t ref, size_t size);
     void movRA(std::vector<uint8_t>& code, Register dist, Register base, Register index, int scale, int32_t ref, size_t size);
     void movRI(std::vector<uint8_t>& code, Register dist, int32_t imm, size_t size);
     void movAR(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
-    void movAR(std::vector<uint8_t>& code, uint32_t address, Register src, size_t size);
+    std::vector<size_t> movAR(std::vector<uint8_t>& code, uint32_t address, Register src, size_t size);
     void movAR(std::vector<uint8_t>& code, Register base, int32_t ref, Register src, size_t size);
     void movAI(std::vector<uint8_t>& code, Register dist, int32_t imm, size_t size);
-    void movAI(std::vector<uint8_t>& code, uint32_t address, int32_t imm, size_t size);
+    std::vector<size_t> movAI(std::vector<uint8_t>& code, uint32_t address, int32_t imm, size_t size);
     void movAI(std::vector<uint8_t>& code, Register base, int32_t ref, int32_t imm, size_t size);
 
     void pushR(std::vector<uint8_t>& code, Register reg);
@@ -473,27 +503,27 @@ namespace pick::x86_64
 
     void opRR(std::vector<uint8_t>& code, uint8_t lCode, uint8_t eCode, Register dist, Register src, size_t size);
     void opRA(std::vector<uint8_t>& code, uint8_t lCode, uint8_t eCode, Register dist, Register src, size_t size);
-    void opRA(std::vector<uint8_t>& code, uint8_t lCode, uint8_t eCode, Register dist, uint32_t address, size_t size);
+    std::vector<size_t> opRA(std::vector<uint8_t>& code, uint8_t lCode, uint8_t eCode, Register dist, uint32_t address, size_t size);
     void opRA(std::vector<uint8_t>& code, uint8_t lCode, uint8_t eCode, Register dist, Register base, int32_t ref, size_t size);
     void opRA(std::vector<uint8_t>& code, uint8_t lCode, uint8_t eCode, Register dist, Register base, Register index, int scale, int32_t ref, size_t size);
     void opAR(std::vector<uint8_t>& code, uint8_t lCode, uint8_t eCode, Register dist, Register src, size_t size);
-    void opAR(std::vector<uint8_t>& code, uint8_t lCode, uint8_t eCode, uint32_t address, Register src, size_t size);
+    std::vector<size_t> opAR(std::vector<uint8_t>& code, uint8_t lCode, uint8_t eCode, uint32_t address, Register src, size_t size);
     void opAR(std::vector<uint8_t>& code, uint8_t lCode, uint8_t eCode, Register base, int32_t ref, Register src, size_t size);
     void opAR(std::vector<uint8_t>& code, uint8_t lCode, uint8_t eCode, Register base, Register index, int scale, int32_t ref, Register src, size_t size);
     void opImmGrp1R(std::vector<uint8_t>& code, ImmGrp1 immGrp, Register dist, int32_t imm, size_t size);
     void opImmGrp1A(std::vector<uint8_t>& code, ImmGrp1 immGrp, Register dist, int32_t imm, size_t size);
-    void opImmGrp1A(std::vector<uint8_t>& code, ImmGrp1 immGrp, uint32_t address, int32_t imm, size_t size);
+    std::vector<size_t> opImmGrp1A(std::vector<uint8_t>& code, ImmGrp1 immGrp, uint32_t address, int32_t imm, size_t size);
     void opImmGrp1A(std::vector<uint8_t>& code, ImmGrp1 immGrp, Register base, int32_t ref, int32_t imm, size_t size);
     void xidivRR(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
     void xidivRA(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
-    void xidivRA(std::vector<uint8_t>& code, Register dist, uint32_t address, size_t size);
+    std::vector<size_t> xidivRA(std::vector<uint8_t>& code, Register dist, uint32_t address, size_t size);
     void xidivRA(std::vector<uint8_t>& code, Register dist, Register base, int32_t ref, size_t size);
     void xidivRI(std::vector<uint8_t>& code, Register dist, int32_t imm, size_t size);
     void xidivAR(std::vector<uint8_t>& code, Register dist, Register src, size_t size);
-    void xidivAR(std::vector<uint8_t>& code, uint32_t address, Register src, size_t size);
+    std::vector<size_t> xidivAR(std::vector<uint8_t>& code, uint32_t address, Register src, size_t size);
     void xidivAR(std::vector<uint8_t>& code, Register base, int32_t ref, Register src, size_t size);
     void xidivAI(std::vector<uint8_t>& code, Register dist, int32_t imm, size_t size);
-    void xidivAI(std::vector<uint8_t>& code, uint32_t address, int32_t imm, size_t size);
+    std::vector<size_t> xidivAI(std::vector<uint8_t>& code, uint32_t address, int32_t imm, size_t size);
     void xidivAI(std::vector<uint8_t>& code, Register base, int32_t ref, int32_t imm, size_t size);
 
     uint8_t modRM(Register dist, Register src);
