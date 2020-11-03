@@ -44,23 +44,23 @@ namespace pickc::windows::x64
       auto size = x64.typeTable[symbol->type].getSize();
       switch(size) {
         case 8:
-          x64.invokeMain->code.push_back(new MovOperation(OperationSize::Byte, Operand(Memory(Register::RCX)), Operand(Register::RAX)));
+          x64.invokeMain->code.push_back(new MovOperation(OperationSize::Byte, Operand(Memory(Register::RCX, 1, true)), Operand(Register::RAX)));
           break;
         case 16:
-          x64.invokeMain->code.push_back(new MovOperation(OperationSize::Word, Operand(Memory(Register::RCX)), Operand(Register::RAX)));
+          x64.invokeMain->code.push_back(new MovOperation(OperationSize::Word, Operand(Memory(Register::RCX, 2, true)), Operand(Register::RAX)));
           break;
         case 32:
-          x64.invokeMain->code.push_back(new MovOperation(OperationSize::DWord, Operand(Memory(Register::RCX)), Operand(Register::RAX)));
+          x64.invokeMain->code.push_back(new MovOperation(OperationSize::DWord, Operand(Memory(Register::RCX, 4, true)), Operand(Register::RAX)));
           break;
         case 64:
-          x64.invokeMain->code.push_back(new MovOperation(OperationSize::QWord, Operand(Memory(Register::RCX)), Operand(Register::RAX)));
+          x64.invokeMain->code.push_back(new MovOperation(OperationSize::QWord, Operand(Memory(Register::RCX, 8, true)), Operand(Register::RAX)));
           break;
         default:
           assert(false);
       }
     }
     x64.invokeMain->code.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RAX), Operand(Relocation(mainSymbol))));
-    x64.invokeMain->code.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RAX), Operand(Memory(Register::RAX))));
+    x64.invokeMain->code.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RAX), Operand(Memory(Register::RAX, 8, true))));
     x64.invokeMain->code.push_back(new CallOperation(x64.invokeMain, Operand(Register::RAX)));
     x64.invokeMain->code.push_back(new LeaveOperation());
     x64.invokeMain->code.push_back(new RetOperation());

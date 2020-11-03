@@ -2,9 +2,16 @@
 
 namespace pickc::windows::x64
 {
-  BinaryVec BinaryOperation::binaryOpTemplate(uint8_t ebgb, uint8_t evgv, uint8_t gbeb, uint8_t gvev, uint8_t alib, uint8_t axiz, uint8_t immop, OperationSize size, const Operand& dist, const Operand& src)
+  BinaryVec BinaryOperation::binaryOpTemplate(Routine* routine, uint8_t ebgb, uint8_t evgv, uint8_t gbeb, uint8_t gvev, uint8_t alib, uint8_t axiz, uint8_t immop)
   {
     BinaryVec code;
+
+    if(dist.type == OperandType::Memory && dist.memory.base && dist.memory.base.get() == Register::RBP && dist.memory.needAddressFix) {
+      dist.memory.disp += routine->baseDiff;
+    }
+    if(src.type == OperandType::Memory && src.memory.base && src.memory.base.get() == Register::RBP && src.memory.needAddressFix) {
+      src.memory.disp += routine->baseDiff;
+    }
 
     if(size == OperationSize::Word) code.push_back(0x66);
 
@@ -66,8 +73,9 @@ namespace pickc::windows::x64
           opcode.push_back(0b11'000'000 | immop | modRM(Register::RAX, dist.reg));
         }
         if(size == OperationSize::Byte || (in8bit(src.imm))) operand << static_cast<int8_t>(src.imm);
-        if(size == OperationSize::Word) operand << static_cast<int16_t>(src.imm);
+        else if(size == OperationSize::Word) operand << static_cast<int16_t>(src.imm);
         else if(size == OperationSize::DWord) operand << static_cast<int32_t>(src.imm);
+        else if(src.imm <= INT32_MAX && src.imm >= INT32_MIN) operand << static_cast<int32_t>(src.imm);
         else assert(false);
       }
       else {
@@ -130,6 +138,7 @@ namespace pickc::windows::x64
         if(size == OperationSize::Byte) operand << static_cast<int8_t>(src.imm);
         else if(size == OperationSize::Word) operand << static_cast<int16_t>(src.imm);
         else if(size == OperationSize::DWord) operand << static_cast<int32_t>(src.imm);
+        else if(src.imm <= INT32_MAX && src.imm >= INT32_MIN) operand << static_cast<int32_t>(src.imm);
         else assert(false);
       }
     }
@@ -148,10 +157,10 @@ namespace pickc::windows::x64
   }
   BinaryVec AddOperation::bin(WindowsX64& x64, Routine* routine)
   {
-    return binaryOpTemplate(0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0b00'000'000, size, dist, src);
+    return binaryOpTemplate(routine, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0b00'000'000);
   }
   BinaryVec SubOperation::bin(WindowsX64& x64, Routine* routine)
   {
-    return binaryOpTemplate(0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0b00'101'000, size, dist, src);
+    return binaryOpTemplate(routine, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0b00'101'000);
   }
 }

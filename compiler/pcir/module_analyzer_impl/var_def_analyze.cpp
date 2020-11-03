@@ -39,6 +39,7 @@ namespace pickc::pcir
           reg->status = RegisterStatus::InUse;
           reg->vType = ValueType::LeftValue;
           reg->type = Type::merge(Mov, expectedType, res.get()->type);
+          reg->scope = RegisterScope::LocalVariable;
           (*flow)->vars[varDef->name->name] = reg;
         }
       }
@@ -52,6 +53,7 @@ namespace pickc::pcir
       reg->status = RegisterStatus::Uninited;
       reg->vType = ValueType::LeftValue;
       reg->type = expectedType;
+      reg->scope = RegisterScope::LocalVariable;
       (*flow)->vars[varDef->name->name] = reg;
     }
     if(errors.empty()) return ok(reg);

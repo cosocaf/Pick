@@ -40,6 +40,7 @@ namespace pickc::pcir
           distReg->status = RegisterStatus::InUse;
           distReg->vType = ValueType::RightValue;
           distReg->type = baseReg->type;
+          distReg->scope = RegisterScope::LocalVariable;
           (*flow)->addReg(distReg);
         }
         auto inst = new UnaryInstruction();
@@ -69,6 +70,7 @@ namespace pickc::pcir
           reg->status = RegisterStatus::InUse;
           reg->vType = ValueType::RightValue;
           reg->type = base.get()->type;
+          reg->scope = RegisterScope::LocalVariable;
           (*flow)->addReg(reg);
           auto inst = new UnaryInstruction();
           inst->inst = uinst;
@@ -140,6 +142,7 @@ namespace pickc::pcir
             reg->status = RegisterStatus::InUse;
             reg->vType = ValueType::RightValue;
             reg->type = *fn.get()->type.fn.retType;
+            reg->scope = RegisterScope::LocalVariable;
             (*flow)->addReg(reg);
             auto inst = new CallInstruction();
             inst->fn = fn.get();

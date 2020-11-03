@@ -68,6 +68,7 @@ namespace pickc::pcir
   }
   BinaryVec SemanticAnalyzer::compileFunction(const Function* fn)
   {
+
     std::vector<BinaryVec> flows;
     for(const auto& flow : fn->flows) {
       BinaryVec code;
@@ -134,6 +135,21 @@ namespace pickc::pcir
           code << LoadFn;
           code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), loadFn->reg)));
           code << static_cast<uint32_t>(std::distance(functions.begin(), functions.find(loadFn->fn)));
+        }
+        else if(instanceof<LoadArgInstruction>(inst)) {
+          auto loadArg = dynamic_cast<const LoadArgInstruction*>(inst);
+          code << LoadArg;
+          code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), loadArg->reg)));
+          code << loadArg->indexOfArg;
+        }
+        else if(instanceof<MovInstruction>(inst)) {
+          auto mov = dynamic_cast<const MovInstruction*>(inst);
+          code << Mov;
+          code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), mov->dist)));
+          code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), mov->src)));
+        }
+        else {
+          assert(false);
         }
       }
       BinaryVec normal;
@@ -431,6 +447,7 @@ namespace pickc::pcir
               case RetV: std::cout << "RETV" << std::endl; break;
               case LoadFn: std::cout << "LOADFN Register #" << get32(flow->normal.code, k) << " Function #" << get32(flow->normal.code, k) << std::endl; break;
               case Mov: std::cout << "MOV #" << get32(flow->normal.code, k) << " #" << get32(flow->normal.code, k) << std::endl; break;
+              case LoadArg: std::cout << "LOADARG Register #" << get32(flow->normal.code, k) << " Arg #" << get32(flow->normal.code, k) << std::endl; break;
               default:
                 std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)flow->normal.code[k] << std::endl;
                 break;

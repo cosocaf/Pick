@@ -498,7 +498,7 @@ namespace pickc::parser
       delete left.get();
       return error(createEOTError("式が必要です。"));
     }
-    auto right = asignGenerate();
+    auto right = exprGenerate();
     if(!right) {
       delete left.get();
       return error(right.err());
@@ -969,6 +969,8 @@ namespace pickc::parser
           auto res = externGenerate();
           break;
         }
+        case TokenKind::Semicolon:
+          break;
         default:
           errors.push_back(createASTError("予期しないトークン。宣言文を期待しました。", token.get()));
           // 同じエラーが連続するのを避けるため、次の宣言までスキップする

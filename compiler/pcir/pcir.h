@@ -123,12 +123,19 @@ namespace pickc::pcir
     InUse,
     Moved,
   };
+  enum struct RegisterScope
+  {
+    LocalVariable,
+    Argument,
+    GlobalVariable,
+  };
   struct Register
   {
     Mutability mut;
     ValueType vType;
     Type type;
     RegisterStatus status;
+    RegisterScope scope; 
   };
 
   struct FlowNode;
@@ -200,6 +207,11 @@ namespace pickc::pcir
     Register* reg;
     Function* fn;
   };
+  struct LoadArgInstruction : public Instruction
+  {
+    Register* reg;
+    uint32_t indexOfArg;
+  };
   struct MovInstruction : public Instruction
   {
     Register* dist;
@@ -213,7 +225,7 @@ namespace pickc::pcir
     FlowNode* parentFlow;
     FlowNode* nextFlow;
     std::vector<Instruction*> insts;
-    std::map<std::string, Register*> vars;
+    std::unordered_map<std::string, Register*> vars;
     Register* result;
     Register* findVar(const std::string& name) const;
     Option<std::string> retNotice(const Type& t) const;
@@ -231,7 +243,7 @@ namespace pickc::pcir
     std::vector<FlowNode*> flows;
     std::vector<Register*> regs;
     Register* result;
-    std::map<std::string, Register*> args;
+    std::vector<std::string> args;
     std::unordered_map<std::string, DefaultArgument> defaultArgs;
     FlowNode* belong;
     Option<std::string> retNotice(const Type& t) const;

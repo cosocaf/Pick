@@ -59,6 +59,11 @@ namespace pickc::ssa
     SSARegister* dist;
     pcir::FunctionSection* fn;
   };
+  struct SSALoadArgInstruction : public SSAInstruction
+  {
+    SSARegister* dist;
+    uint32_t indexOfArg;
+  };
   struct SSACallInstruction : public SSAInstruction
   {
     SSARegister* dist;
@@ -66,8 +71,15 @@ namespace pickc::ssa
     std::vector<SSARegister*> args;
   };
 
+  struct SSAMovInstruction : public SSAInstruction
+  {
+    SSARegister* dist;
+    SSARegister* src;
+  };
+
   struct SSAFunction
   {
+    pcir::TypeSection* type;
     // 関数の命令列
     std::vector<SSAInstruction*> insts;
     // 関数が使用するレジスタ一覧

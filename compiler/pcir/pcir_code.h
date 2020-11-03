@@ -103,6 +103,12 @@ namespace pickc::pcir
   */
   constexpr uint8_t LoadFn = 0x30;
   /**
+   * LoadArg
+   * 引数を読み込む。dist = args[index]
+   * LoadArg dist(u32, index of regs), index(u32, index of args)
+  */
+  constexpr uint8_t LoadArg = 0x31;
+  /**
    * Mov
    * 移動命令。レジスタの持つ値をコピーする。dist = src
    * この命令はシャローコピーを行う。

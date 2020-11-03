@@ -24,7 +24,7 @@ namespace pickc::windows::x64
   class RoutineCompiler
   {
     /**
-     * pickcが保存用レジスタとして使うレジスタ。
+     * pickcが値の保存用レジスタとして使うレジスタ。
      * RAX, RDXはMul, Divで使用する。
     */
     static constexpr auto useRegs = {
@@ -52,11 +52,45 @@ namespace pickc::windows::x64
       Register::R10,
       Register::R11
     };
+    /**
+     * useRegsの中で、関数の呼び出しによって変化しないレジスタ。
+     * これらを関数内で使用した場合、関数の終了時に値を復元する必要がある。
+    */
+    static constexpr auto nonvolatileRegs = {
+      Register::RBX,
+      Register::RSI,
+      Register::RDI,
+      Register::R12,
+      Register::R13,
+      Register::R14,
+      Register::R15
+    };
+    static constexpr auto argRegs = {
+      Register::RCX,
+      Register::RDX,
+      Register::R8,
+      Register::R9
+    };
     Routine* routine;
+    std::vector<Operation*> prologue;
+    std::vector<Operation*> body;
+    std::vector<Operation*> epilogue;
+    // スタックの空き状況
+    // バイト単位での使用状況を保持し、
+    // trueなら使用中、falseなら不使用を表す。
+    std::vector<bool> stackStatus;
     size_t curLifeTime;
     std::unordered_map<Register, RegisterInfo> regInfo;
     std::unordered_map<ssa::SSARegister*, Operand> regs;
+    std::vector<Operand> args;
+    // 現在のスタックの伸び
+    int32_t stack;
+    // 最も伸びたスタックの長さ
+    int32_t minStack;
     Operand createOperand();
+    // スタックを確保する。
+    // 現状フラグメンテーションは無視する。
+    Memory allocStack(size_t numBytes);
     void saveRegs();
     void freeRegs();
     OperationSize getSize(const pcir::TypeSection* type);

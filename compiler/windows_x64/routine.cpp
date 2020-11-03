@@ -85,7 +85,8 @@ namespace pickc::windows::x64
   {
     return value <= INT8_MAX && value >= INT8_MIN;
   }
-  Memory::Memory(Register base) : base(some(base)), scale(none), index(0), disp(0) {}
+  Memory::Memory(Register base, size_t numBytes, bool needAddressFix) : base(some(base)), scale(none), index(0), disp(0), numBytes(numBytes), needAddressFix(needAddressFix) {}
+  Memory::Memory(Register base, int32_t disp, size_t numBytes, bool needAddressFix) : base(some(base)), scale(none), index(0), disp(disp), numBytes(numBytes), needAddressFix(needAddressFix) {}
   Operand::Operand() : type(OperandType::_NONE) {}
   Operand::Operand(Register reg) : type(OperandType::Register), reg(reg) {}
   Operand::Operand(int64_t imm) : type(OperandType::Immediate), imm(imm) {}
@@ -97,6 +98,8 @@ namespace pickc::windows::x64
   Operand::Operand(const Operand& operand) : type(operand.type)
   {
     switch(type) {
+      case OperandType::_NONE:
+        break;
       case OperandType::Register:
         reg = operand.reg;
         break;
@@ -122,6 +125,8 @@ namespace pickc::windows::x64
     clear();
     type = operand.type;
     switch(type) {
+      case OperandType::_NONE:
+        break;
       case OperandType::Register:
         reg = operand.reg;
         break;

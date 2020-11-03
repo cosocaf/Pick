@@ -3,13 +3,18 @@
 namespace pickc::windows::x64
 {
   CallOperation::CallOperation(Routine* from, const Operand& fn) : Operation(OperationSize::QWord), from(from), fn(fn) {
-    // 絶対アドレスでのコールは対応しない。
+    // 絶対アドレスでのコールは現状対応しない。
     // OS作るとかなら使うが、ソフトウェアを作る限りはまず使用しない。
     assert(fn.type != OperandType::Immediate);
   }
   BinaryVec CallOperation::bin(WindowsX64& x64, Routine* routine)
   {
     BinaryVec code;
+    
+    if(fn.type == OperandType::Memory && fn.memory.base && fn.memory.base.get() == Register::RBP && fn.memory.needAddressFix) {
+      fn.memory.disp += routine->baseDiff;
+    }
+
     switch(fn.type) {
       case OperandType::Register:
         if(fn.reg >= Register::R8 && fn.reg <= Register::R15) code.push_back(0x40 | REXB);
@@ -17,6 +22,7 @@ namespace pickc::windows::x64
         code.push_back(0xD0 | modRM(Register::RAX, fn.reg));
         break;
       case OperandType::Memory: {
+        code.push_back(0xFF);
         uint8_t mod = 0;
         if(fn.memory.disp) {
           if(in8bit(fn.memory.disp)) {

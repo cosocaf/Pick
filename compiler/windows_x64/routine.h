@@ -220,7 +220,13 @@ namespace pickc::windows::x64
     Option<Register> scale;
     uint8_t index: 2;
     int32_t disp;
-    Memory(Register base);
+    // routine_compilerが用いるこのメモリの使用するバイト数。
+    // 機械語には関係ない。
+    size_t numBytes;
+    // routine::baseDeffによるdispの修正が必要ならtrue
+    bool needAddressFix;
+    Memory(Register base, size_t numBytes, bool needAddressFix);
+    Memory(Register base, int32_t disp, size_t numBytes, bool needAddressFix);
   };
   struct Operand
   {
@@ -249,7 +255,7 @@ namespace pickc::windows::x64
     Operand dist;
     Operand src;
     // ADD, OR, ADC, SBB, AND, SUB, XOR, CMP用テンプレート
-    static BinaryVec binaryOpTemplate(uint8_t ebgb, uint8_t evgv, uint8_t gbeb, uint8_t gvev, uint8_t alib, uint8_t axiz, uint8_t immop, OperationSize size, const Operand& dist, const Operand& src);
+    BinaryVec binaryOpTemplate(Routine* routine, uint8_t ebgb, uint8_t evgv, uint8_t gbeb, uint8_t gvev, uint8_t alib, uint8_t axiz, uint8_t immop);
   public:
     BinaryOperation(OperationSize size, const Operand& dist, const Operand& src);
   };
@@ -352,6 +358,8 @@ namespace pickc::windows::x64
     // codeごとのnativeCode内の開始アドレス
     // これとaddressを組み合わせて再配置を行う。
     std::unordered_map<Operation*, size_t> codeIndexes;
+    // 非volatileなレジスタを保存したり、RSPをアラインメントしたりした時のスタックのずれ
+    int32_t baseDiff;
   };
 
   struct WindowsX64

@@ -52,6 +52,7 @@ namespace pickc::ssa
   Result<SSAFunction, std::vector<std::string>> SSAConverter::fnConvert(const pcir::PCIRFile& pcir, const pcir::FunctionSection* pcirFn)
   {
     SSAFunction fn{};
+    fn.type = pcirFn->type;
     std::vector<std::string> errors;
     std::unordered_map<pcir::RegisterStruct*, SSARegister*> pcirRegs;
     auto flow = pcirFn->entryFlow;
@@ -132,6 +133,20 @@ namespace pickc::ssa
                 fn.insts.push_back(loadFn);
                 break;
               }
+              case pcir::LoadArg: {
+                auto dist = pcirFn->regs[get32(flow->normal.code, i)];
+                auto index = get32(flow->normal.code, i);
+                auto reg = new SSARegister();
+                reg->type = dist->type;
+                reg->lifeBegin = reg->lifeEnd = lifeTime;
+                fn.regs.insert(reg);
+                auto loadArg = new SSALoadArgInstruction();
+                loadArg->dist = reg;
+                loadArg->indexOfArg = index;
+                pcirRegs[dist] = reg;
+                fn.insts.push_back(loadArg);
+                break;
+              }
               case pcir::Call: {
                 auto dist = pcirFn->regs[get32(flow->normal.code, i)];
                 auto call = pcirFn->regs[get32(flow->normal.code, i)];
@@ -153,6 +168,21 @@ namespace pickc::ssa
                   pcirRegs[arg]->lifeEnd = lifeTime;
                 }
                 fn.insts.push_back(callInst);
+                break;
+              }
+              case pcir::Mov: {
+                auto dist = pcirFn->regs[get32(flow->normal.code, i)];
+                auto src = pcirFn->regs[get32(flow->normal.code, i)];
+                auto reg = new SSARegister();
+                reg->type = dist->type;
+                reg->lifeBegin = reg->lifeEnd = lifeTime;
+                pcirRegs[dist] = reg;
+                fn.regs.insert(reg);
+                auto mov = new SSAMovInstruction();
+                mov->dist = reg;
+                mov->src = pcirRegs[src];
+                mov->src->lifeEnd = lifeTime;
+                fn.insts.push_back(mov);
                 break;
               }
               default:

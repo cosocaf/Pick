@@ -6,6 +6,13 @@ namespace pickc::windows::x64
   {
     BinaryVec code;
 
+    if(dist.type == OperandType::Memory && dist.memory.base && dist.memory.base.get() == Register::RBP && dist.memory.needAddressFix) {
+      dist.memory.disp += routine->baseDiff;
+    }
+    if(src.type == OperandType::Memory && src.memory.base && src.memory.base.get() == Register::RBP && src.memory.needAddressFix) {
+      src.memory.disp += routine->baseDiff;
+    }
+
     if(size == OperationSize::Word) code.push_back(0x66);
 
     uint8_t rex = 0;
@@ -61,6 +68,10 @@ namespace pickc::windows::x64
           opcode.push_back(0xB8 | modRM(Register::RAX, dist.reg));
           if(size == OperationSize::Word) operand << static_cast<int16_t>(src.imm);
           else if(size == OperationSize::DWord) operand << static_cast<int32_t>(src.imm);
+          else if(src.imm <= INT32_MAX && src.imm >= INT32_MIN) {
+            rex &= ~REXW;
+            operand << static_cast<int32_t>(src.imm);
+          }
           else operand << src.imm;
         }
       }

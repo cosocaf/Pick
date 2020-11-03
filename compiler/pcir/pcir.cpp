@@ -10,6 +10,8 @@ namespace pickc::pcir
   {
     if(vars.find(name) != vars.end()) return vars.at(name);
     if(parentFlow) return parentFlow->findVar(name);
+    if(belong->belong) return belong->belong->findVar(name);
+    // TODO: find global vars
     return nullptr;
   }
   Option<std::string> FlowNode::retNotice(const Type& t) const
@@ -20,7 +22,7 @@ namespace pickc::pcir
   {
     belong->addReg(reg);
   }
-  Function::Function() : entryFlow(new FlowNode()), flows({ entryFlow })
+  Function::Function() : entryFlow(new FlowNode()), result(nullptr), flows({ entryFlow }), belong(nullptr)
   {
     entryFlow->belong = this;
   }
@@ -73,17 +75,20 @@ namespace pickc::pcir
     else if (instanceof<ArrayTypeNode>(typeNode)) {
       type = Types::Array;
       auto arrayNode = dynamic_cast<ArrayTypeNode*>(typeNode);
+      new (&array) TypeArray();
       array.elem = new Type(arrayNode->elemType);
       array.length = static_cast<uint32_t>(arrayNode->length);
     }
     else if (instanceof<PtrTypeNode>(typeNode)) {
       type = Types::Ptr;
       auto ptrNode = dynamic_cast<PtrTypeNode*>(typeNode);
+      new (&ptr) TypePtr();
       ptr.elem = new Type(ptrNode->base);
     }
     else if (instanceof<FnTypeNode>(typeNode)) {
       type = Types::Function;
       auto fnNode = dynamic_cast<FnTypeNode*>(typeNode);
+      new (&fn) TypeFunction();
       fn.retType = new Type(fnNode->ret);
       fn.args.reserve(fnNode->args.size());
       for(auto arg : fnNode->args) {

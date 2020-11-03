@@ -13,27 +13,34 @@ namespace pickc::pcir
     TypeFunction type;
     type.retType = new Type(fnDef->retType);
 
-    for(auto argDef : fnDef->args) {
+    for(uint32_t index = 0, l = fnDef->args.size(); index < l; ++index) {
+      auto argDef = fnDef->args[index];
       type.args.push_back(new Type(argDef->type));
-      if(fn->args.find(argDef->name->name) != fn->args.end()) {
+      if(std::find(fn->args.begin(), fn->args.end(), argDef->name->name) != fn->args.end()) {
         errors.push_back(createSemanticError(argDef, "引数名 " + argDef->name->name + " が重複しています。"));
       }
-      else {
-        auto arg = new Register();
-        arg->mut = argDef->isMut ? Mutability::Mutable : Mutability::Immutable;
-        arg->status = RegisterStatus::InUse;
-        arg->vType = ValueType::LeftValue;
-        arg->type = Type(argDef->type);
-        fn->args[argDef->name->name] = arg;
-        if(argDef->init) {
-          fn->defaultArgs[argDef->name->name].flow = new FlowNode();
-          fn->defaultArgs[argDef->name->name].flow->belong = fn;
-          if(auto defaultArg = exprAnalyze(argDef->init, &fn->defaultArgs[argDef->name->name].flow)) {
-            fn->defaultArgs[argDef->name->name].reg = defaultArg.get();
-          }
-          else errors += defaultArg.err();
+      auto arg = new Register();
+      arg->mut = argDef->isMut ? Mutability::Mutable : Mutability::Immutable;
+      arg->status = RegisterStatus::InUse;
+      arg->vType = ValueType::LeftValue;
+      arg->type = Type(argDef->type);
+      arg->scope = RegisterScope::Argument;
+      fn->args.push_back(argDef->name->name);
+      fn->regs.push_back(arg);
+      fn->entryFlow->vars[argDef->name->name] = arg;
+      if(argDef->init) {
+        fn->defaultArgs[argDef->name->name].flow = new FlowNode();
+        fn->defaultArgs[argDef->name->name].flow->belong = fn;
+        if(auto defaultArg = exprAnalyze(argDef->init, &fn->defaultArgs[argDef->name->name].flow)) {
+          fn->defaultArgs[argDef->name->name].reg = defaultArg.get();
         }
+        else errors += defaultArg.err();
       }
+
+      auto loadArg = new LoadArgInstruction();
+      loadArg->reg = arg;
+      loadArg->indexOfArg = index;
+      fn->entryFlow->insts.push_back(loadArg);
     }
     if(!errors.empty()) {
       delete fn;
@@ -58,6 +65,7 @@ namespace pickc::pcir
       auto reg = new Register();
       reg->status = RegisterStatus::InUse;
       reg->type = fn->type;
+      reg->scope = RegisterScope::LocalVariable;
       if(fnDef->name) {
         if((*flow)->findVar(fnDef->name->name)) errors.push_back(createSemanticError(fnDef->name, "既に変数 " + fnDef->name->name + " は定義されています。"));
         reg->mut = Mutability::Immutable;

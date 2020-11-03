@@ -161,9 +161,9 @@ namespace pickc::pcir
       stream.read((char*)&numOfRegs, 4);
       fn->regs.reserve(numOfRegs);
       for(uint32_t j = 0; j < numOfRegs; ++j) {
-        uint32_t reg;
-        stream.read((char*)&reg, 4);
-        fn->regs.push_back(new RegisterStruct{ file.typeSection[reg] });
+        uint32_t type;
+        stream.read((char*)&type, 4);
+        fn->regs.push_back(new RegisterStruct{ file.typeSection[type] });
       }
       uint32_t numFlows;
       stream.read((char*)&numFlows, 4);

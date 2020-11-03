@@ -5,6 +5,10 @@ namespace pickc::windows::x64
   PushOperation::PushOperation(const Operand& value) : Operation(OperationSize::QWord), value(value) {}
   BinaryVec PushOperation::bin(WindowsX64& x64, Routine* routine)
   {
+    if(value.type == OperandType::Memory && value.memory.base && value.memory.base.get() == Register::RBP && value.memory.needAddressFix) {
+      value.memory.disp += routine->baseDiff;
+    }
+
     uint8_t rex = 0;
     BinaryVec opcode;
     BinaryVec operand;

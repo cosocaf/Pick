@@ -36,6 +36,7 @@ namespace pickc::pcir
         reg->status = RegisterStatus::InUse;
         reg->vType = ValueType::RightValue;
         reg->type = Type::merge(code, left.get()->type, right.get()->type);
+        reg->scope = RegisterScope::LocalVariable;
         (*flow)->addReg(reg);
         auto inst = new BinaryInstruction();
         inst->dist = reg;
@@ -59,6 +60,37 @@ namespace pickc::pcir
     }
     else if(instanceof<SubNode>(binary)) {
       binaryInst(Sub, BinaryInstructions::Sub);
+    }
+    else if(instanceof<AsignNode>(binary)) {
+      auto asign = dynamic_cast<const AsignNode*>(binary);
+      auto left = exprAnalyze(asign->left, flow);
+      auto right = exprAnalyze(asign->right, flow);
+      if(!left) errors += left.err();
+      else if(!right) errors += right.err();
+      else if(!Type::castable(left.get()->type, right.get()->type)) {
+        errors.push_back(createSemanticError(binary, "型 " + left.get()->type.toString() + " に型 " + right.get()->type.toString() + " は代入できません。"));
+      }
+      else if(right.get()->status == RegisterStatus::Uninited) {
+        errors.push_back(createSemanticError(asign->right, "初期化されていない変数です。"));
+      }
+      else if(right.get()->status == RegisterStatus::Moved) {
+        errors.push_back(createSemanticError(asign->right, "既に移動された変数です。"));
+      }
+      else if(left.get()->vType == ValueType::RightValue) {
+        errors.push_back(createSemanticError(asign->right, "右辺値に値は代入できません。"));
+      }
+      else if(left.get()->mut == Mutability::Immutable && left.get()->status == RegisterStatus::InUse) {
+        errors.push_back(createSemanticError(asign->right, "イミュータブルな値に代入しようとしました。"));
+      }
+      else {
+        left.get()->status = RegisterStatus::InUse;
+        right.get()->status = RegisterStatus::Moved;
+        reg = left.get();
+        auto inst = new MovInstruction();
+        inst->dist = reg;
+        inst->src = right.get();
+        (*flow)->insts.push_back(inst);
+      }
     }
     else {
       assert(false);
