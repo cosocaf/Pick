@@ -78,7 +78,7 @@ namespace pickc::windows::x64
       else if(src.type == OperandType::Relocation) {
         if(dist.reg >= Register::R8 && dist.reg <= Register::R15) rex |= REXB;
         opcode.push_back(0xB8 | modRM(Register::RAX, dist.reg));
-        x64.relocs.insert(new RelocationInfo(routine, src.reloc, this, 2, OperationSize::QWord, RelocationPosition::Absolute));
+        x64.relocs.insert(new RelocationInfo(routine, src.reloc, this, rex ? 2 : 1, OperationSize::QWord, RelocationPosition::Absolute));
         opcode << 0ll;
       }
       else {

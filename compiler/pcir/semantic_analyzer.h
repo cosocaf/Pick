@@ -16,6 +16,7 @@ namespace pickc::pcir
 {
   class SemanticAnalyzer
   {
+    friend class ModuleAnalyzer;
     ModuleTree* rootTree;
     std::set<std::string> texts;
     std::set<Type> types;

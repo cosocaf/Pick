@@ -95,6 +95,19 @@ namespace pickc::windows::x64
           body.push_back(new MovOperation(getSize(loadArg->dist->type), regs[loadArg->dist], args[loadArg->indexOfArg]));
         }
       }
+      else if(instanceof<SSALoadSymbolInstruction>(inst)) {
+        auto loadSymbol = dynamic_cast<SSALoadSymbolInstruction*>(inst);
+        assert(regs.find(loadSymbol->dist) == regs.end());
+        body.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RAX), Operand(Relocation(loadSymbol->symbol))));
+        regs[loadSymbol->dist] = createOperand();
+        if(regs[loadSymbol->dist].type == OperandType::Register) {
+          body.push_back(new MovOperation(getSize(loadSymbol->dist->type), regs[loadSymbol->dist], Operand(Memory(Register::RAX, 8, false))));
+        }
+        else {
+          body.push_back(new MovOperation(getSize(loadSymbol->dist->type), Operand(Register::RAX), Operand(Memory(Register::RAX, 8, false))));
+          body.push_back(new MovOperation(getSize(loadSymbol->dist->type), regs[loadSymbol->dist], Operand(Register::RAX)));
+        }
+      }
       else if(instanceof<SSACallInstruction>(inst)) {
         auto call = dynamic_cast<SSACallInstruction*>(inst);
         assert(regs.find(call->dist) == regs.end());
@@ -154,8 +167,8 @@ namespace pickc::windows::x64
     for(auto reg : nonvolatileRegs) {
       if(regInfo[reg] != RegisterInfo::Unused) {
         routine->baseDiff -= 8;
-        saveNonvolatileRegs.push_back(new MovOperation(OperationSize::QWord, Operand(Memory(Register::RBP, routine->baseDiff, false)), Operand(reg)));
-        epilogue.push_back(new MovOperation(OperationSize::QWord, Operand(reg), Operand(Memory(Register::RBP, routine->baseDiff, false))));
+        saveNonvolatileRegs.push_back(new MovOperation(OperationSize::QWord, Operand(Memory(Register::RBP, 8, false)), Operand(reg)));
+        epilogue.push_back(new MovOperation(OperationSize::QWord, Operand(reg), Operand(Memory(Register::RBP, 8, false))));
       }
     }
 
@@ -206,7 +219,7 @@ namespace pickc::windows::x64
           for(size_t j = 0; j < cur; ++j) {
             stackStatus[i - j] = true;
           }
-          return Memory(Register::RBP, -cur, true);
+          return Memory(Register::RBP, numBytes, true);
         }
       }
       else {
@@ -215,7 +228,10 @@ namespace pickc::windows::x64
     }
     stack -= numBytes;
     minStack = std::min(stack, minStack);
-    return Memory(Register::RBP, stack, true);
+    for(size_t i = 0; i < numBytes; ++i) {
+      stackStatus.push_back(true);
+    }
+    return Memory(Register::RBP, numBytes, true);
   }
   void RoutineCompiler::saveRegs()
   {
@@ -251,7 +267,7 @@ namespace pickc::windows::x64
             regInfo[reg->second.reg] = RegisterInfo::Used;
             break;
           case OperandType::Memory:
-            if(reg->second.memory.base && reg->second.memory.base.get() == Register::RBP) {
+            if(reg->second.memory.base && reg->second.memory.base.get() == Register::RBP && reg->second.memory.needAddressFix) {
               // TODO: call destructor
               for(int i = 0; i < reg->second.memory.numBytes; ++i) {
                 assert(stackStatus[-reg->second.memory.disp + i]);

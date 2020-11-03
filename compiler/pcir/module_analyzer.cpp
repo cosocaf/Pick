@@ -4,9 +4,11 @@
 #include "utils/vector_utils.h"
 #include "utils/instanceof.h"
 
+#include "semantic_analyzer.h"
+
 namespace pickc::pcir
 {
-  ModuleAnalyzer::ModuleAnalyzer(ModuleTree* tree) : tree(tree) {}
+  ModuleAnalyzer::ModuleAnalyzer(SemanticAnalyzer* sa, ModuleTree* tree) : sa(sa), tree(tree) {}
   std::string ModuleAnalyzer::createSemanticError(const parser::Node* node, const std::string& message)
   {
     // assert(false);
@@ -74,11 +76,13 @@ namespace pickc::pcir
         if(tree->module.symbols.find(fn->name->name) == tree->module.symbols.end()) {
           auto symbol = new Symbol();
           symbol->name = fn->name->name;
+          symbol->fullyQualifiedName = tree->name + "::" + symbol->name;
           symbol->type = Types::Any;
           symbol->scope = fn->isPub ? Scope::Public : Scope::Private;
           symbol->mut = Mutability::Immutable;
           symbol->expr = fn;
           tree->module.symbols[fn->name->name] = symbol;
+          sa->texts.insert(symbol->fullyQualifiedName);
         }
         else errors.push_back(createSemanticError(fn->name, "既にシンボル " + fn->name->name + " は存在します。"));
       }
@@ -87,11 +91,13 @@ namespace pickc::pcir
         if(tree->module.symbols.find(var->name->name) == tree->module.symbols.end()) {
           auto symbol = new Symbol();
           symbol->name = var->name->name;
+          symbol->fullyQualifiedName = tree->name + "::" + symbol->name;
           symbol->type = var->type;
           symbol->scope = var->isPub ? Scope::Public : Scope::Private;
           symbol->mut = var->isMut ? Mutability::Mutable : Mutability::Immutable;
           symbol->expr = var->init;
           tree->module.symbols[var->name->name] = symbol;
+          sa->texts.insert(symbol->fullyQualifiedName);
         }
         else errors.push_back(createSemanticError(var->name, "既にシンボル " + var->name->name + " は存在します。"));
       }
@@ -132,7 +138,8 @@ namespace pickc::pcir
               errors.push_back(createSemanticError(symbol.second->expr, "変数の型は " + symbol.second->type.toString() + " ですが、" + init.get()->type.toString() + "が代入されました。"));
             }
             else {
-              TypeFunction tf;
+              symbol.second->type = Type::merge(Mov, symbol.second->type, init.get()->type);
+              TypeFunction tf{};
               tf.retType = new Type(init.get()->type);
               symbol.second->init->type = tf;
               auto ret = new ReturnInstruction();
@@ -150,5 +157,17 @@ namespace pickc::pcir
     }
     if(errors.empty()) return none;
     return some(errors);
+  }
+  Symbol* ModuleAnalyzer::findGlobalVar(const parser::VariableNode* var)
+  {
+    using namespace parser;
+    if(instanceof<ScopedVariableNode>(var)) {
+      // TODO
+      assert(false);
+    }
+    else {
+      if(tree->module.symbols.find(var->name) == tree->module.symbols.end()) return nullptr;
+      return tree->module.symbols[var->name];
+    }
   }
 }

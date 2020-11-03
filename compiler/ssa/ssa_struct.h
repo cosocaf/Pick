@@ -64,6 +64,11 @@ namespace pickc::ssa
     SSARegister* dist;
     uint32_t indexOfArg;
   };
+  struct SSALoadSymbolInstruction : public SSAInstruction
+  {
+    SSARegister* dist;
+    pcir::SymbolSection* symbol;
+  };
   struct SSACallInstruction : public SSAInstruction
   {
     SSARegister* dist;

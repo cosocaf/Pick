@@ -8,8 +8,10 @@
 
 namespace pickc::pcir
 {
+  class SemanticAnalyzer;
   class ModuleAnalyzer
   {
+    SemanticAnalyzer* sa;
     ModuleTree* tree;
     std::string createSemanticError(const parser::Node* node, const std::string& message);
     // void型を返す時はnullptrを返す。
@@ -22,8 +24,9 @@ namespace pickc::pcir
     Result<Register*, std::vector<std::string>> binaryAnalyze(const parser::BinaryNode* binary, FlowNode** flow);
     Result<Register*, std::vector<std::string>> varDefAnalyze(const parser::VariableDefineNode* varDef, FlowNode** flow);
     Result<Register*, std::vector<std::string>> fnDefAnalyze(const parser::FunctionDefineNode* fnDef, FlowNode** flow);
+    Symbol* findGlobalVar(const parser::VariableNode* var);
   public:
-    ModuleAnalyzer(ModuleTree* tree);
+    ModuleAnalyzer(SemanticAnalyzer* sa, ModuleTree* tree);
     Option<std::vector<std::string>> declare();
     Option<std::vector<std::string>> analyze();
   };

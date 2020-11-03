@@ -22,7 +22,7 @@ namespace pickc::pcir
   Option<std::vector<std::string>> SemanticAnalyzer::declare(ModuleTree* tree)
   {
     std::vector<std::string> errors;
-    if(auto errs = ModuleAnalyzer(tree).declare()) errors += errs.get();
+    if(auto errs = ModuleAnalyzer(this, tree).declare()) errors += errs.get();
     for(auto sub : tree->submodules) if(auto errs = declare(sub.second)) errors += errs.get();
     if(errors.empty()) return none;
     return some(errors);
@@ -30,7 +30,7 @@ namespace pickc::pcir
   Option<std::vector<std::string>> SemanticAnalyzer::analyze(ModuleTree* tree)
   {
     std::vector<std::string> errors;
-    if(auto errs = ModuleAnalyzer(tree).analyze()) errors += errs.get();
+    if(auto errs = ModuleAnalyzer(this, tree).analyze()) errors += errs.get();
     for(auto sub : tree->submodules) if(auto errs = analyze(sub.second)) errors += errs.get();
     if(errors.empty()) return none;
     return some(errors);
@@ -141,6 +141,12 @@ namespace pickc::pcir
           code << LoadArg;
           code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), loadArg->reg)));
           code << loadArg->indexOfArg;
+        }
+        else if(instanceof<LoadSymbolInstruction>(inst)) {
+          auto loadSymbol = dynamic_cast<const LoadSymbolInstruction*>(inst);
+          code << LoadSymbol;
+          code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), loadSymbol->reg)));
+          code << static_cast<uint32_t>(std::distance(texts.begin(), texts.find(loadSymbol->name)));
         }
         else if(instanceof<MovInstruction>(inst)) {
           auto mov = dynamic_cast<const MovInstruction*>(inst);
@@ -446,8 +452,9 @@ namespace pickc::pcir
               case Ret: std::cout << "RET #" << get32(flow->normal.code, k) << std::endl; break;
               case RetV: std::cout << "RETV" << std::endl; break;
               case LoadFn: std::cout << "LOADFN Register #" << get32(flow->normal.code, k) << " Function #" << get32(flow->normal.code, k) << std::endl; break;
-              case Mov: std::cout << "MOV #" << get32(flow->normal.code, k) << " #" << get32(flow->normal.code, k) << std::endl; break;
               case LoadArg: std::cout << "LOADARG Register #" << get32(flow->normal.code, k) << " Arg #" << get32(flow->normal.code, k) << std::endl; break;
+              case LoadSymbol: std::cout << "LOADSYMBOL Register #" << get32(flow->normal.code, k) << " Symbol " << pcir.textSection[get32(flow->normal.code, k)]->text; break;
+              case Mov: std::cout << "MOV #" << get32(flow->normal.code, k) << " #" << get32(flow->normal.code, k) << std::endl; break;
               default:
                 std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)flow->normal.code[k] << std::endl;
                 break;

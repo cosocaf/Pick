@@ -212,6 +212,12 @@ namespace pickc::pcir
     Register* reg;
     uint32_t indexOfArg;
   };
+  struct LoadSymbolInstruction : public Instruction
+  {
+    Register* reg;
+    std::string name;
+  };
+
   struct MovInstruction : public Instruction
   {
     Register* dist;
@@ -254,6 +260,7 @@ namespace pickc::pcir
   struct Symbol
   {
     std::string name;
+    std::string fullyQualifiedName;
     Type type;
     Scope scope;
     Mutability mut;

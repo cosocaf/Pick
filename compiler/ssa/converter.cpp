@@ -147,6 +147,36 @@ namespace pickc::ssa
                 fn.insts.push_back(loadArg);
                 break;
               }
+              case pcir::LoadSymbol: {
+                auto dist = pcirFn->regs[get32(flow->normal.code, i)];
+                auto name = pcir.textSection[get32(flow->normal.code, i)];
+                auto reg = new SSARegister();
+                reg->type = dist->type;
+                reg->lifeBegin = reg->lifeEnd = lifeTime;
+                fn.regs.insert(reg);
+                auto loadSym = new SSALoadSymbolInstruction();
+                loadSym->dist = reg;
+                loadSym->symbol = nullptr;
+                auto moduleName = name->text.substr(0, name->text.rfind("::"));
+                auto symbolName = name->text.substr(name->text.rfind("::") + 2);
+                for(const auto& pcir : pcirs) {
+                  for(const auto& module : pcir.moduleSection) {
+                    if(module->name->text == moduleName) {
+                      for(const auto& symbol : module->symbols) {
+                        if(symbol->name->text == symbolName) {
+                          loadSym->symbol = symbol;
+                          break;
+                        }
+                      }
+                    }
+                    if(loadSym->symbol != nullptr) break;
+                  }
+                  if(loadSym->symbol != nullptr) break;
+                }
+                pcirRegs[dist] = reg;
+                fn.insts.push_back(loadSym);
+                break;
+              }
               case pcir::Call: {
                 auto dist = pcirFn->regs[get32(flow->normal.code, i)];
                 auto call = pcirFn->regs[get32(flow->normal.code, i)];

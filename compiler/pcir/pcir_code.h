@@ -109,6 +109,14 @@ namespace pickc::pcir
   */
   constexpr uint8_t LoadArg = 0x31;
   /**
+   * LoadSymbol
+   * シンボルを読み込む。dist = symbol
+   * 外部PCIR空の読み込みにも対応するため、シンボル名からの指定になる。
+   * そのため、シンボル名は完全修飾名でなければならない。
+   * LoadSymbol dist(u32, index of regs), name(u32, index of text section)
+  */
+  constexpr uint8_t LoadSymbol = 0x32;
+  /**
    * Mov
    * 移動命令。レジスタの持つ値をコピーする。dist = src
    * この命令はシャローコピーを行う。
