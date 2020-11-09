@@ -3,18 +3,19 @@
 #include "semantic_analyzer.h"
 
 #include <fstream>
-#include <iostream>
-#include <iomanip>
 #include <filesystem>
 #include <ctime>
 
 #include "pickc/config.h"
 #include "utils/vector_utils.h"
+#include "utils/set_utils.h"
+#include "utils/map_utils.h"
 #include "utils/binary_vec.h"
 #include "utils/instanceof.h"
+#include "utils/dyn_cast.h"
 #include "module_analyzer.h"
 #include "pcir_format.h"
-#include "pcir_struct.h"
+#include "pcir_dump.h"
 
 namespace pickc::pcir
 {
@@ -48,6 +49,9 @@ namespace pickc::pcir
     }
     for(auto& fn : mod->module.functions) {
       insertType(fn->type);
+      for(auto& reg : fn->regs) {
+        insertType(reg->type);
+      }
       functions[fn];
     }
     for(auto& sub : mod->submodules) {
@@ -68,27 +72,32 @@ namespace pickc::pcir
   }
   BinaryVec SemanticAnalyzer::compileFunction(const Function* fn)
   {
-
     std::vector<BinaryVec> flows;
     for(const auto& flow : fn->flows) {
       BinaryVec code;
       for(const auto inst : flow->insts) {
         if(instanceof<BinaryInstruction>(inst)) {
-          auto bin = dynamic_cast<BinaryInstruction*>(inst);
+          auto bin = dynCast<BinaryInstruction>(inst);
           switch(bin->inst) {
             case BinaryInstructions::Add: code << Add; break;
             case BinaryInstructions::Sub: code << Sub; break;
             case BinaryInstructions::Mul: code << Mul; break;
             case BinaryInstructions::Div: code << Div; break;
             case BinaryInstructions::Mod: code << Mod; break;
+            case BinaryInstructions::EQ: code << EQ; break;
+            case BinaryInstructions::NEQ: code << NEQ; break;
+            case BinaryInstructions::GT: code << GT; break;
+            case BinaryInstructions::GE: code << GE; break;
+            case BinaryInstructions::LT: code << LT; break;
+            case BinaryInstructions::LE: code << LE; break;
             default: assert(false);
           }
-          code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), bin->dist)));
-          code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), bin->left)));
-          code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), bin->right)));
+          code << static_cast<uint32_t>(indexOf(fn->regs, bin->dist));
+          code << static_cast<uint32_t>(indexOf(fn->regs, bin->left));
+          code << static_cast<uint32_t>(indexOf(fn->regs, bin->right));
         }
         else if(instanceof<UnaryInstruction>(inst)) {
-          auto uni = dynamic_cast<UnaryInstruction*>(inst);
+          auto uni = dynCast<UnaryInstruction>(inst);
           switch(uni->inst) {
             case UnaryInstructions::Inc: code << Inc; break;
             case UnaryInstructions::Dec: code << Dec; break;
@@ -96,13 +105,13 @@ namespace pickc::pcir
             case UnaryInstructions::Neg: code << Neg; break;
             default: assert(false);
           }
-          code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), uni->dist)));
-          code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), uni->reg)));
+          code << static_cast<uint32_t>(indexOf(fn->regs, uni->dist));
+          code << static_cast<uint32_t>(indexOf(fn->regs, uni->reg));
         }
         else if(instanceof<ImmMove>(inst)) {
-          auto imm = dynamic_cast<const ImmMove*>(inst);
+          auto imm = dynCast<ImmMove>(inst);
           code << Imm;
-          code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), imm->dist)));
+          code << static_cast<uint32_t>(indexOf(fn->regs, imm->dist));
           switch(imm->dist->type.type) {
             case Types::I8: code << imm->imm.i8; break;
             case Types::I16: code << imm->imm.i16; break;
@@ -112,76 +121,98 @@ namespace pickc::pcir
           }
         }
         else if(instanceof<CallInstruction>(inst)) {
-          auto call = dynamic_cast<const CallInstruction*>(inst);
+          auto call = dynCast<CallInstruction>(inst);
           code << Call;
-          code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), call->dist)));
-          code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), call->fn)));
+          code << static_cast<uint32_t>(indexOf(fn->regs, call->dist));
+          code << static_cast<uint32_t>(indexOf(fn->regs, call->fn));
           for(auto& arg : call->args) {
-            code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), arg)));
-          }
-        }
-        else if(instanceof<ReturnInstruction>(inst)) {
-          auto ret = dynamic_cast<const ReturnInstruction*>(inst);
-          if(ret->reg) {
-            code << Ret;
-            code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), ret->reg)));
-          }
-          else {
-            code << RetV;
+            code << static_cast<uint32_t>(indexOf(fn->regs, arg));
           }
         }
         else if(instanceof<LoadFnInstruction>(inst)) {
-          auto loadFn = dynamic_cast<const LoadFnInstruction*>(inst);
+          auto loadFn = dynCast<LoadFnInstruction>(inst);
           code << LoadFn;
-          code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), loadFn->reg)));
-          code << static_cast<uint32_t>(std::distance(functions.begin(), functions.find(loadFn->fn)));
+          code << static_cast<uint32_t>(indexOf(fn->regs, loadFn->reg));
+          code << static_cast<uint32_t>(indexOf(functions, loadFn->fn));
         }
         else if(instanceof<LoadArgInstruction>(inst)) {
-          auto loadArg = dynamic_cast<const LoadArgInstruction*>(inst);
+          auto loadArg = dynCast<LoadArgInstruction>(inst);
           code << LoadArg;
-          code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), loadArg->reg)));
+          code << static_cast<uint32_t>(indexOf(fn->regs, loadArg->reg));
           code << loadArg->indexOfArg;
         }
         else if(instanceof<LoadSymbolInstruction>(inst)) {
-          auto loadSymbol = dynamic_cast<const LoadSymbolInstruction*>(inst);
+          auto loadSymbol = dynCast<LoadSymbolInstruction>(inst);
           code << LoadSymbol;
-          code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), loadSymbol->reg)));
-          code << static_cast<uint32_t>(std::distance(texts.begin(), texts.find(loadSymbol->name)));
+          code << static_cast<uint32_t>(indexOf(fn->regs, loadSymbol->reg));
+          code << static_cast<uint32_t>(indexOf(texts, loadSymbol->name));
         }
         else if(instanceof<MovInstruction>(inst)) {
-          auto mov = dynamic_cast<const MovInstruction*>(inst);
+          auto mov = dynCast<MovInstruction>(inst);
           code << Mov;
-          code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), mov->dist)));
-          code << static_cast<uint32_t>(std::distance(fn->regs.begin(), std::find(fn->regs.begin(), fn->regs.end(), mov->src)));
+          code << static_cast<uint32_t>(indexOf(fn->regs, mov->dist));
+          code << static_cast<uint32_t>(indexOf(fn->regs, mov->src));
+        }
+        else if(instanceof<PhiInstruction>(inst)) {
+          auto phi = dynCast<PhiInstruction>(inst);
+          code << Phi;
+          code << static_cast<uint32_t>(indexOf(fn->regs, phi->dist));
+          code << static_cast<uint32_t>(indexOf(fn->regs, phi->r1));
+          code << static_cast<uint32_t>(indexOf(fn->regs, phi->r2));
         }
         else {
           assert(false);
         }
       }
-      BinaryVec normal;
-      normal << FLOW_TYPE_NORMAL;
-      if(flow->parentFlow) {
-        normal << static_cast<uint32_t>(std::distance(fn->flows.begin(), std::find(fn->flows.begin(), fn->flows.end(), flow->parentFlow)));
+
+      BinaryVec flowVec;
+      uint32_t typeFlag = 0;
+      switch(flow->type) {
+        case FlowType::Normal:
+          typeFlag |= FLOW_TYPE_NORMAL;
+          break;
+        case FlowType::ConditionalBranch:
+          typeFlag |= FLOW_TYPE_COND_BRANCH;
+          break;
+        case FlowType::EndPoint:
+          typeFlag |= FLOW_TYPE_END_POINT;
+          break;
+        default:
+          assert(false);
+      }
+      flowVec << typeFlag;
+      if(includes(fn->flows, flow->parentFlow)) {
+        flowVec << static_cast<uint32_t>(indexOf(fn->flows, flow->parentFlow));
       }
       else {
-        normal << static_cast<uint32_t>(-1);
+        flowVec << static_cast<uint32_t>(-1);
       }
-      if(flow->nextFlow) {
-        normal << static_cast<uint32_t>(std::distance(fn->flows.begin(), std::find(fn->flows.begin(), fn->flows.end(), flow->nextFlow)));
+      if(typeFlag & FLOW_TYPE_NORMAL) {
+        flowVec << static_cast<uint32_t>(indexOf(fn->flows, flow->nextFlow));
       }
-      else {
-        normal << static_cast<uint32_t>(-1);
+      else if(typeFlag & FLOW_TYPE_COND_BRANCH) {
+        flowVec << static_cast<uint32_t>(indexOf(fn->regs, flow->cond));
+        flowVec << static_cast<uint32_t>(indexOf(fn->flows, flow->thenFlow));
+        flowVec << static_cast<uint32_t>(indexOf(fn->flows, flow->elseFlow));
       }
-      normal << static_cast<uint32_t>(code.size());
-      normal << code;
-      flows.push_back(std::move(normal));
+      else if(typeFlag & FLOW_TYPE_END_POINT) {
+        if(flow->retReg != nullptr) {
+          flowVec << static_cast<uint32_t>(indexOf(fn->regs, flow->retReg));
+        }
+        else {
+          flowVec << static_cast<uint32_t>(-1);
+        }
+      }
+      flowVec << static_cast<uint32_t>(code.size());
+      flowVec << code;
+      flows.push_back(flowVec);
     }
 
     BinaryVec result;
-    result << static_cast<uint32_t>(std::distance(types.begin(), types.find(fn->type)));
+    result << static_cast<uint32_t>(indexOf(types, fn->type));
     result << static_cast<uint32_t>(fn->regs.size());
     for(const auto& reg : fn->regs) {
-      result << static_cast<uint32_t>(std::distance(types.begin(), types.find(reg->type)));
+      result << static_cast<uint32_t>(indexOf(types, reg->type));
     }
     result << static_cast<uint32_t>(flows.size());
     result << static_cast<uint32_t>(0);
@@ -213,10 +244,10 @@ namespace pickc::pcir
     BinaryVec moduleSection;
     moduleSection << static_cast<uint32_t>(modules.size());
     for(const auto& mod : modules) {
-      moduleSection << static_cast<uint32_t>(std::distance(texts.begin(), texts.find(mod.first)));
+      moduleSection << static_cast<uint32_t>(indexOf(texts, mod.first));
       moduleSection << static_cast<uint32_t>(mod.second->symbols.size());
       for(const auto& sym : mod.second->symbols) {
-        moduleSection << static_cast<uint32_t>(std::distance(symbols.begin(), std::find(symbols.begin(), symbols.end(), sym.second)));
+        moduleSection << static_cast<uint32_t>(indexOf(symbols, sym.second));
       }
     }
 
@@ -231,17 +262,17 @@ namespace pickc::pcir
       else if(type.isChar()) typeSection << TYPE_CHAR << type.size();
       else if(type.isArray())
         typeSection << TYPE_ARRAY << type.size()
-                    << static_cast<uint32_t>(std::distance(types.begin(), types.find(*type.array.elem)))
+                    << static_cast<uint32_t>(indexOf(types, *type.array.elem))
                     << type.array.length;
       else if(type.isPtr())
         typeSection << TYPE_PTR << type.size()
-                    << static_cast<uint32_t>(std::distance(types.begin(), types.find(*type.ptr.elem)));
+                    << static_cast<uint32_t>(indexOf(types, *type.ptr.elem));
       else if(type.isFn()) {
-        typeSection << TYPE_FUNCTION << type.size();
-        typeSection << static_cast<uint32_t>(std::distance(types.begin(), types.find(*type.fn.retType)));
-        typeSection << static_cast<uint32_t>(type.fn.args.size());
+        typeSection << TYPE_FUNCTION << type.size()
+                    << static_cast<uint32_t>(indexOf(types, *type.fn.retType))
+                    << static_cast<uint32_t>(type.fn.args.size());
         for(const auto& arg : type.fn.args) {
-          typeSection << static_cast<uint32_t>(std::distance(types.begin(), types.find(*arg)));
+          typeSection << static_cast<uint32_t>(indexOf(types, *arg));
         }
       }
       else {
@@ -252,13 +283,13 @@ namespace pickc::pcir
     BinaryVec symbolSection;
     symbolSection << static_cast<uint32_t>(symbols.size());
     for(const auto& sym : symbols) {
-      symbolSection << static_cast<uint32_t>(std::distance(texts.begin(), texts.find(sym->name)));
+      symbolSection << static_cast<uint32_t>(indexOf(texts, sym->name));
       uint32_t access = 0;
       if(sym->scope == Scope::Public) access |= ACCESS_PUBLIC;
       if(sym->mut == Mutability::Mutable) access |= ACCESS_MUTABLE;
       symbolSection << access;
-      symbolSection << static_cast<uint32_t>(std::distance(types.begin(), types.find(sym->init->result->type)));
-      symbolSection << static_cast<uint32_t>(std::distance(functions.begin(), functions.find(sym->init)));
+      symbolSection << static_cast<uint32_t>(indexOf(types, sym->init->result->type));
+      symbolSection << static_cast<uint32_t>(indexOf(functions, sym->init));
     }
 
     BinaryVec fnSection;
@@ -288,183 +319,9 @@ namespace pickc::pcir
     stream.close();
 
     if(option.compilerDebug) {
-      dumpPCIR(path.string());
+      dump(path.string());
     }
 
     return none;
-  }
-  void SemanticAnalyzer::dumpPCIR(const std::string& path)
-  {
-    auto res = PCIRLoader().load(path);
-    if(!res) return;
-    auto pcir = res.get();
-
-    std::cout << "PCIR Dump" << std::endl;
-    std::cout << "Dump of file " << path << std::endl;
-
-    std::cout << "PCIR FILE HEADER" << std::endl;
-    std::cout << "Magic:                            ";
-    std::cout.write(pcir.magic, 4);
-    std::cout << std::endl;
-    std::cout << "Time stamp:                       " << std::hex << std::setw(16) << std::setfill('0')
-              << pcir.timeStamp << " "
-              << std::asctime(std::localtime((std::time_t*)&pcir.timeStamp));
-    std::cout << "Major version:                    " << pcir.majorVersion << std::endl;
-    std::cout << "Minor version:                    " << pcir.minorVersion << std::endl;
-    std::cout << "Pointer to text header:           " << std::hex << std::setw(8) << std::setfill('0') << pcir.ptrToTextHeader << std::endl;
-    std::cout << "Pointer to module header:         " << std::hex << std::setw(8) << std::setfill('0') << pcir.ptrToModuleHeader << std::endl;
-    std::cout << "Pointer to type table header:     " << std::hex << std::setw(8) << std::setfill('0') << pcir.ptrToTypeTableHeader << std::endl;
-    std::cout << "Pointer to symbol table header:   " << std::hex << std::setw(8) << std::setfill('0') << pcir.ptrToSymbolTableHeader << std::endl;
-    std::cout << "Pointer to function table header: " << std::hex << std::setw(8) << std::setfill('0') << pcir.ptrToFunctionTableHeader << std::endl;
-    std::cout << '\n';
-
-    std::cout << "PCIR TEXT SECTION" << std::endl;
-    std::cout << "Number of texts:                  " << std::hex << std::setw(8) << std::setfill('0') << pcir.textSection.size() << std::endl;
-    for(size_t i = 0, l = pcir.textSection.size(); i < l; ++i) {
-      std::string outStr;
-      outStr += "Text #";
-      outStr += std::to_string(i);
-      outStr += ":";
-      outStr.append(34 - outStr.size(), ' ');
-      std::cout << outStr << pcir.textSection[i]->text << std::endl;
-    }
-    std::cout << '\n';
-
-    std::cout << "PCIR MODULE SECTION" << std::endl;
-    std::cout << "Number of modules:                " << std::hex << std::setw(8) << std::setfill('0') << pcir.moduleSection.size() << std::endl;
-    for(size_t i = 0, l = pcir.moduleSection.size(); i < l; ++i) {
-      auto module = pcir.moduleSection[i];
-      std::cout << "Module #" << i << std::endl;
-      std::cout << "    Name:                         " << module->name->text << std::endl;
-      std::cout << "    Symbols:" << std::endl;
-      for(size_t j = 0, jl = module->symbols.size(); j < jl; ++j) {
-        std::cout << "        Symbol #" << std::distance(pcir.symbolSection.begin(), std::find(pcir.symbolSection.begin(), pcir.symbolSection.end(), module->symbols[j])) << std::endl;
-      }
-    }
-    std::cout << '\n';
-
-    std::cout << "PCIR TYPE SECTION" << std::endl;
-    std::cout << "Number of types:                  " << std::hex << std::setw(8) << std::setfill('0') << pcir.typeSection.size() << std::endl;
-    for(size_t i = 0, l = pcir.typeSection.size(); i < l; ++i) {
-      std::cout << "Type #" << i << std::endl;
-      std::cout << "    Name:                         " << pcir.typeSection[i]->type.toString() << std::endl;
-    }
-    std::cout << '\n';
-
-    std::cout << "PCIR SYMBOL SECTION" << std::endl;
-    std::cout << "Number of symbols:                " << std::hex << std::setw(8) << std::setfill('0') << pcir.symbolSection.size() << std::endl;
-    for(size_t i = 0, l = pcir.symbolSection.size(); i < l; ++i) {
-      auto symbol = pcir.symbolSection[i];
-      std::cout << "Symbol #" << i << std::endl;
-      std::cout << "    Name:                         " << symbol->name->text << std::endl;
-      std::cout << "    Scope:                        " << (symbol->scope == Scope::Public ? "public" : "private") << std::endl;
-      std::cout << "    Mutability:                   " << (symbol->mut == Mutability::Mutable ? "mutable" : "immutable") << std::endl;
-      std::cout << "    Type:                         " << symbol->type->type.toString() << std::endl;
-      std::cout << "    Init:                         Function #" << std::distance(pcir.fnSection.begin(), std::find(pcir.fnSection.begin(), pcir.fnSection.end(), symbol->init)) << std::endl;
-    }
-    std::cout << '\n';
-
-    std::cout << "PCIR FUNCTION SECTION" << std::endl;
-    std::cout << "Number of functions:              " << std::hex << std::setw(8) << std::setfill('0') << pcir.fnSection.size() << std::endl;
-    for(size_t i = 0, l = pcir.fnSection.size(); i < l; ++i) {
-      auto fn = pcir.fnSection[i];
-      std::cout << "Function #" << i << std::endl;
-      std::cout << "    Type:                         " << fn->type->type.toString() << std::endl;
-      std::cout << "    Entry Flow:                   Flow #" << std::distance(fn->flows.begin(), std::find(fn->flows.begin(), fn->flows.end(), fn->entryFlow)) << std::endl;
-      std::cout << "    Registers:" << std::endl;
-      for(size_t j = 0, jl = fn->regs.size(); j < jl; ++j) {
-        std::cout << "        Register #" << j << std::endl;
-        std::cout << "            Type:                 " << fn->regs[j]->type->type.toString() << std::endl;
-      }
-      std::cout << "    Flows:" << std::endl;
-      for(size_t j = 0, jl = fn->flows.size(); j < jl; ++j) {
-        auto flow = fn->flows[j];
-        std::cout << "        Flow #" << j << std::endl;
-        if(flow == fn->entryFlow) {
-          std::cout << "            *Entry Flow*" << std::endl;
-        }
-        else {
-          std::cout << "            Parent:               ";
-          if(flow->parent == nullptr) std::cout << "none" << std::endl;
-          else std::cout << "Flow #" << std::distance(fn->flows.begin(), std::find(fn->flows.begin(), fn->flows.end(), flow->parent)) << std::endl;
-        }
-        std::cout << "            Next Flow:            ";
-        if(flow->normal.next == nullptr) std::cout << "none" << std::endl;
-        else std::cout << "Flow #" << std::distance(fn->flows.begin(), std::find(fn->flows.begin(), fn->flows.end(), flow->normal.next)) << std::endl;
-        std::cout << "            Flow Type:            ";
-        if(flow->flowType == FLOW_TYPE_NORMAL) {
-          std::cout << "Normal" << std::endl;
-          std::cout << "            Code:" << std::endl;
-          for(size_t k = 0, kl = flow->normal.code.size(); k < kl; ++k) {
-            const auto binary = [&](const std::string& inst) {
-              std::cout << inst << " #" << get32(flow->normal.code, k) << " #" << get32(flow->normal.code, k) << " #" << get32(flow->normal.code, k) << std::endl;
-            };
-            const auto unary = [&](const std::string& inst) {
-              std::cout << inst << " #" << get32(flow->normal.code, k) << " #" << get32(flow->normal.code, k) << std::endl;
-            };
-            std::cout << "                ";
-            switch(flow->normal.code[k]) {
-              case Add: binary("ADD"); break;
-              case Sub: binary("SUB"); break;
-              case Mul: binary("MUL"); break;
-              case Div: binary("DIV"); break;
-              case Mod: binary("MOD"); break;
-              case Inc: unary("INC"); break;
-              case Dec: unary("DEC"); break;
-              case Pos: unary("POS"); break;
-              case Neg: unary("NEG"); break;
-              case Imm: {
-                auto dist = get32(flow->normal.code, k);
-                std::cout << "IMM #" << dist << " ";
-                switch(fn->regs[dist]->type->types) {
-                  case Types::I8:
-                  case Types::U8:
-                    std::cout << (int)get8(flow->normal.code, k) << std::endl;
-                    break;
-                  case Types::I16:
-                  case Types::U16:
-                    std::cout << get16(flow->normal.code, k) << std::endl;
-                    break;
-                  case Types::I32:
-                  case Types::U32:
-                    std::cout << get32(flow->normal.code, k) << std::endl;
-                    break;
-                  case Types::I64:
-                  case Types::U64:
-                    std::cout << get64(flow->normal.code, k) << std::endl;
-                    break;
-                }
-                break;
-              }
-              case Call: {
-                std::cout << "CALL #" << get32(flow->normal.code, k) << " #";
-                auto call = get32(flow->normal.code, k);
-                std::cout << call << " (";
-                auto type = fn->regs[call]->type;
-                assert(type->types == Types::Function);
-                for(size_t arg = 0; arg < type->numOfArgs; ++arg) {
-                  std::cout << "#" << get32(flow->normal.code, k);
-                  if(arg + 1 < type->numOfArgs) std::cout << " ";
-                }
-                std::cout << ")" << std::endl;
-                break;
-              }
-              case Ret: std::cout << "RET #" << get32(flow->normal.code, k) << std::endl; break;
-              case RetV: std::cout << "RETV" << std::endl; break;
-              case LoadFn: std::cout << "LOADFN Register #" << get32(flow->normal.code, k) << " Function #" << get32(flow->normal.code, k) << std::endl; break;
-              case LoadArg: std::cout << "LOADARG Register #" << get32(flow->normal.code, k) << " Arg #" << get32(flow->normal.code, k) << std::endl; break;
-              case LoadSymbol: std::cout << "LOADSYMBOL Register #" << get32(flow->normal.code, k) << " Symbol " << pcir.textSection[get32(flow->normal.code, k)]->text; break;
-              case Mov: std::cout << "MOV #" << get32(flow->normal.code, k) << " #" << get32(flow->normal.code, k) << std::endl; break;
-              default:
-                std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)flow->normal.code[k] << std::endl;
-                break;
-            }
-          }
-        }
-        else {
-          assert(false);
-        }
-      }
-    }
   }
 }

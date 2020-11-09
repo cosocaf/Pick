@@ -29,6 +29,9 @@ namespace pickc::pcir
     else if(instanceof<FunctionDefineNode>(expr)) {
       return fnDefAnalyze(dynamic_cast<const FunctionDefineNode*>(expr), flow);
     }
+    else if(instanceof<IfNode>(expr)) {
+      return ifAnalyze(dynamic_cast<const IfNode*>(expr), flow);
+    }
     else {
       assert(false);
     }

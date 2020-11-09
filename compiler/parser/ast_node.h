@@ -134,6 +134,15 @@ namespace pickc::parser
   public:
     virtual void dump(const std::string& indent, const std::string& indent2) const override;
   };
+  class IfNode : public PrimaryNode
+  {
+  public:
+    ExpressionNode* comp;
+    ExpressionNode* thenExpr;
+    ExpressionNode* elseExpr;
+  public:
+    virtual void dump(const std::string& indent, const std::string& indent2) const override;
+  };
   class VariableNode : public PrimaryNode
   {
   public:
@@ -344,6 +353,12 @@ namespace pickc::parser
     virtual void dump(const std::string& indent, const std::string& indent2) const override;
   };
   class MinusNode : public FrontUnaryNode
+  {
+  public:
+    using FrontUnaryNode::FrontUnaryNode;
+    virtual void dump(const std::string& indent, const std::string& indent2) const override;
+  };
+  class CopyNode : public FrontUnaryNode
   {
   public:
     using FrontUnaryNode::FrontUnaryNode;

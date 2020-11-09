@@ -8,4 +8,4 @@ add_executable(
 )
 
 target_include_directories(pickc PRIVATE ${ROOT_DIR})
-target_link_libraries(pickc PRIVATE parser pcir ssa windows_x64 utils)
+target_link_libraries(pickc PRIVATE parser pcir bundler windows_x64 utils)

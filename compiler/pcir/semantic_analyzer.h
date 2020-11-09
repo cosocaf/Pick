@@ -28,7 +28,6 @@ namespace pickc::pcir
     void findModules(ModuleTree* mod);
     void insertType(const Type& type);
     BinaryVec compileFunction(const Function* fn);
-    void dumpPCIR(const std::string& path);
   public:
     SemanticAnalyzer(ModuleTree* rootTree);
     Option<std::vector<std::string>> write(const CompilerOption& option);

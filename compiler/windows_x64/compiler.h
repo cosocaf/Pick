@@ -7,7 +7,7 @@
 
 #include "pickc/compiler_option.h"
 #include "utils/result.h"
-#include "ssa/ssa_struct.h"
+#include "bundler/bundle.h"
 
 #include "routine.h"
 
@@ -16,9 +16,9 @@ namespace pickc::windows::x64
   class Compiler
   {
     WindowsX64 x64;
-    ssa::SSABundle bundle;
+    bundler::Bundle bundle;
   public:
-    Compiler(const ssa::SSABundle& bundle);
+    Compiler(const bundler::Bundle& bundle);
     Result<WindowsX64, std::vector<std::string>> compile(const CompilerOption& option);
   };
 }

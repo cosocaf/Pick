@@ -90,6 +90,7 @@ namespace pickc::parser
     Colon,            // :
     Scope,            // ::
     Comma,            // ,
+    Copy,             // @
     LineComment,      // //
     Integer,          // [0-9]+
     I8,               // [0-9]+i8

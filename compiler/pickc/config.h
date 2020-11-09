@@ -13,7 +13,7 @@ namespace pickc
   constexpr auto STATUS_INVALID_OPTION            = 0x00000001;
   constexpr auto STATUS_PARSER_ERROR              = 0x00000002;
   constexpr auto STATUS_PCIR_ERROR                = 0x00000004;
-  constexpr auto STATUS_SSA_ERROR                 = 0x00000008;
+  constexpr auto STATUS_BUNDLER_ERROR             = 0x00000008;
   constexpr auto STATUS_WINDOWS_X64_ERROR         = 0x00000010;
   constexpr auto STATUS_WINDOWS_X64_LINKER_ERROR  = 0x00000020;
 

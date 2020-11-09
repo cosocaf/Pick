@@ -6,12 +6,12 @@
 
 namespace pickc::pcir
 {
-  Register* FlowNode::findVar(const std::string& name) const
+  Variable* FlowNode::findVar(const std::string& name) const
   {
-    if(vars.find(name) != vars.end()) return vars.at(name);
+    for(const auto& var : vars) if(var->name == name) return var;
+    // if(vars.find(name) != vars.end()) return vars.at(name);
     if(parentFlow) return parentFlow->findVar(name);
     if(belong->belong) return belong->belong->findVar(name);
-    // TODO: find global vars
     return nullptr;
   }
   Option<std::string> FlowNode::retNotice(const Type& t) const
@@ -22,7 +22,7 @@ namespace pickc::pcir
   {
     belong->addReg(reg);
   }
-  Function::Function() : entryFlow(new FlowNode()), result(nullptr), flows({ entryFlow }), belong(nullptr)
+  Function::Function() : entryFlow(new FlowNode{ FlowType::EndPoint }), result(nullptr), flows({ entryFlow }), belong(nullptr)
   {
     entryFlow->belong = this;
   }
@@ -31,7 +31,7 @@ namespace pickc::pcir
     if(!Type::castable(*type.fn.retType, t)) {
       return some("関数は " + type.fn.retType->toString() + " を返しますが、" + t.toString() + " が返されました。");
     }
-    *type.fn.retType = Type::merge(Ret, *type.fn.retType, t);
+    *type.fn.retType = Type::merge(Mov, *type.fn.retType, t);
     return none;
   }
   void Function::addReg(Register* reg)
@@ -195,6 +195,17 @@ namespace pickc::pcir
         assert(right != nullptr);
         return left->type == right->type && (left->isInt() || left->isFloat())
         && (right->isInt() || right->isFloat());
+      case EQ:
+      case NEQ:
+      case GT:
+      case GE:
+      case LT:
+      case LE:
+        assert(right != nullptr);
+        if((left->isInt() || left->isFloat()) && (right->isInt() || right->isFloat())) {
+          return true;
+        }
+        return false;
       case Inc:
       case Dec:
       case Pos:
@@ -235,7 +246,16 @@ namespace pickc::pcir
         }
         assert(false);
         break;
-      case Ret:
+      case EQ:
+      case NEQ:
+      case GT:
+      case GE:
+      case LT:
+      case LE:
+        if((t1.isInt() || t1.isFloat()) && (t2.isInt() || t2.isFloat())) {
+          return Type(Types::Bool);
+        }
+        assert(false);
       case Mov:
         assert(castable(t1, t2));
         return t1;

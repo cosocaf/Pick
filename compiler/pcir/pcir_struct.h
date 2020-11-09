@@ -33,21 +33,16 @@ namespace pickc::pcir
   {
     TypeSection* type;
   };
-  struct FlowStruct;
-  struct NormalFlowStruct
-  {
-    FlowStruct* next;
-    BinaryVec code;
-  };
   struct FlowStruct
   {
     FlowStruct* parent;
     uint32_t flowType;
-    union {
-      NormalFlowStruct normal;
-    };
-    FlowStruct();
-    ~FlowStruct();
+    FlowStruct* next;
+    RegisterStruct* cond;
+    FlowStruct* thenFlow;
+    FlowStruct* elseFlow;
+    RegisterStruct* retReg;
+    BinaryVec code;
   };
   struct FunctionSection
   {

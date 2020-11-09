@@ -4,4 +4,5 @@ add_library(
   utils
   string_utils.cpp
   binary_vec.cpp
+  result.cpp
 )

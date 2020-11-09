@@ -8,6 +8,9 @@ namespace pickc::pcir
   {
     using namespace parser;
     std::vector<std::string> errors;
+
+    if(fnDef->name && (*flow)->findVar(fnDef->name->name)) return error(std::vector{ createSemanticError(fnDef->name, "既に変数 " + fnDef->name->name + " は定義されています。") });
+
     auto fn = new Function();
     fn->belong = *flow;
     TypeFunction type;
@@ -20,14 +23,16 @@ namespace pickc::pcir
         errors.push_back(createSemanticError(argDef, "引数名 " + argDef->name->name + " が重複しています。"));
       }
       auto arg = new Register();
-      arg->mut = argDef->isMut ? Mutability::Mutable : Mutability::Immutable;
-      arg->status = RegisterStatus::InUse;
-      arg->vType = ValueType::LeftValue;
       arg->type = Type(argDef->type);
-      arg->scope = RegisterScope::Argument;
       fn->args.push_back(argDef->name->name);
       fn->regs.push_back(arg);
-      fn->entryFlow->vars[argDef->name->name] = arg;
+      fn->entryFlow->vars.insert(new Variable{
+        argDef->name->name,
+        argDef->isMut ? Mutability::Mutable : Mutability::Immutable,
+        VariableStatus::InUse,
+        arg->type,
+        arg
+      });
       if(argDef->init) {
         fn->defaultArgs[argDef->name->name].flow = new FlowNode();
         fn->defaultArgs[argDef->name->name].flow->belong = fn;
@@ -48,33 +53,30 @@ namespace pickc::pcir
     }
 
     fn->type = type;
-    if(auto body = exprAnalyze(fnDef->body, &fn->entryFlow)) {
+    auto curFlow = fn->entryFlow;
+    if(auto body = exprAnalyze(fnDef->body, &curFlow)) {
       if(body.get()) {
         if(!Type::castable(*fn->type.fn.retType, body.get()->type)) {
           errors.push_back(createSemanticError(fnDef, "関数は " + fn->type.fn.retType->toString() + " を返しますが、" + body.get()->type.toString() + " が返されました。"));
         }
         *fn->type.fn.retType = Type::merge(Mov, *fn->type.fn.retType, body.get()->type);
-        auto ret = new ReturnInstruction();
-        ret->reg = body.get();
-        fn->flows.back()->insts.push_back(ret);
+        curFlow->type = FlowType::EndPoint;
+        curFlow->retReg = body.get();
       }
     }
     else errors += body.err();
     
     if(errors.empty()) {
       auto reg = new Register();
-      reg->status = RegisterStatus::InUse;
       reg->type = fn->type;
-      reg->scope = RegisterScope::LocalVariable;
       if(fnDef->name) {
-        if((*flow)->findVar(fnDef->name->name)) errors.push_back(createSemanticError(fnDef->name, "既に変数 " + fnDef->name->name + " は定義されています。"));
-        reg->mut = Mutability::Immutable;
-        reg->vType = ValueType::LeftValue;
-        (*flow)->vars[fnDef->name->name] = reg;
-      }
-      else {
-        reg->mut = Mutability::Mutable;
-        reg->vType = ValueType::RightValue;
+        (*flow)->vars.insert(new Variable{
+          fnDef->name->name,
+          Mutability::Immutable,
+          VariableStatus::InUse,
+          reg->type,
+          reg
+        });
       }
       (*flow)->addReg(reg);
       auto inst = new LoadFnInstruction();

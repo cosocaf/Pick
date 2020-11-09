@@ -6,6 +6,7 @@
 
 #include "parser/token.h"
 #include "parser/ast_node.h"
+// #include "ir1/ir1.h"
 #include "pcir/pcir.h"
 
 namespace pickc
@@ -19,6 +20,7 @@ namespace pickc
     std::unordered_map<std::string, ModuleTree*> submodules;
     parser::TokenSequence sequence;
     parser::RootNode ast;
+    // ir1::IR1Module ir1Module;
     pcir::Module module;
     size_t countModules() const;
   };

@@ -186,6 +186,8 @@ namespace pickc
     }
   };
 
+  struct _ {};
+
   template<typename T>
   class ok_t
   {
@@ -203,6 +205,7 @@ namespace pickc
   {
     return ok_t<OK>(ok);
   }
+  ok_t<_> ok();
 
   template<typename T>
   class error_t

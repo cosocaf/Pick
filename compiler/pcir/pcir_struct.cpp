@@ -7,16 +7,6 @@
 namespace pickc::pcir
 {
   PCIRLoader::PCIRLoader() {}
-  FlowStruct::FlowStruct() {}
-  FlowStruct::~FlowStruct()
-  {
-    switch(flowType) {
-      case FLOW_TYPE_NORMAL:
-        normal.~NormalFlowStruct();
-        break;
-    }
-    flowType = static_cast<uint32_t>(-1);
-  }
   Result<PCIRFile, std::vector<std::string>> PCIRLoader::load(const std::string& path)
   {
     std::ifstream stream(path, std::ios::binary);
@@ -183,29 +173,44 @@ namespace pickc::pcir
         else {
           flow->parent = fn->flows[indexOfParentFlow];
         }
-        switch(flow->flowType) {
-          case FLOW_TYPE_NORMAL: {
-            new (&flow->normal) NormalFlowStruct();
-            uint32_t indexOfNextFlow;
-            stream.read((char*)&indexOfNextFlow, 4);
-            if(indexOfNextFlow == -1) {
-              flow->normal.next = nullptr;
-            }
-            else {
-              flow->normal.next = fn->flows[indexOfNextFlow];
-            }
-            uint32_t sizeOfCodes;
-            stream.read((char*)&sizeOfCodes, 4);
-            auto code = new uint8_t[sizeOfCodes];
-            stream.read((char*)code, sizeOfCodes);
-            flow->normal.code.reserve(sizeOfCodes);
-            flow->normal.code.insert(flow->normal.code.end(), code, code + sizeOfCodes);
-            delete[] code;
-            break;
+        if(flow->flowType & FLOW_TYPE_NORMAL) {
+          uint32_t indexOfNextFlow;
+          stream.read((char*)&indexOfNextFlow, 4);
+          if(indexOfNextFlow == -1) {
+            flow->next = nullptr;
           }
-          default:
-            return error(std::vector{ path + "は適切PCIRファイルではありません。フロータイプが予期しない値でした。" });
+          else {
+            flow->next = fn->flows[indexOfNextFlow];
+          }
         }
+        else if(flow->flowType & FLOW_TYPE_COND_BRANCH) {
+          uint32_t indexOfComp;
+          stream.read((char*)&indexOfComp, 4);
+          uint32_t indexOfThenFlow;
+          stream.read((char*)&indexOfThenFlow, 4);
+          uint32_t indexOfElseFlow;
+          stream.read((char*)&indexOfElseFlow, 4);
+          flow->cond = fn->regs[indexOfComp];
+          flow->thenFlow = fn->flows[indexOfThenFlow];
+          flow->elseFlow = fn->flows[indexOfElseFlow];
+        }
+        else if(flow->flowType & FLOW_TYPE_END_POINT) {
+          uint32_t indexOfRetReg;
+          stream.read((char*)&indexOfRetReg, 4);
+          if(indexOfRetReg == -1) {
+            flow->retReg = nullptr;
+          }
+          else {
+            flow->retReg = fn->regs[indexOfRetReg];
+          }
+        }
+        uint32_t sizeOfCodes;
+        stream.read((char*)&sizeOfCodes, 4);
+        auto code = new uint8_t[sizeOfCodes];
+        stream.read((char*)code, sizeOfCodes);
+        flow->code.reserve(sizeOfCodes);
+        flow->code.insert(flow->code.end(), code, code + sizeOfCodes);
+        delete[] code;
       }
       fn->entryFlow = fn->flows[entryFlow];
       file.fnSection.push_back(fn);

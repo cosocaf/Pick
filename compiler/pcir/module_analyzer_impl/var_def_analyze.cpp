@@ -13,35 +13,19 @@ namespace pickc::pcir
     if((*flow)->findVar(varDef->name->name)) errors.push_back(createSemanticError(varDef->name, "既に変数 " + varDef->name->name + " は定義されています。"));
     else if(varDef->init) {
       if(auto res = exprAnalyze(varDef->init, flow)) {
-        if(res.get()->status == RegisterStatus::Uninited) {
-          errors.push_back(createSemanticError(varDef, "未初期化の値を代入しようとしています。"));
-        }
-        else if(res.get()->status == RegisterStatus::Moved) {
-          errors.push_back(createSemanticError(varDef, "既に移動された値を代入しようとしています。"));
-        }
-        else if(!Type::castable(expectedType, res.get()->type)) {
+        if(!Type::castable(expectedType, res.get()->type)) {
           errors.push_back(createSemanticError(varDef, "変数の型に式の型を変換できません。"));
         }
-        else {
-          if(res.get()->vType == ValueType::RightValue) {
-            reg = res.get();
+        else if(res.get()->curVar != nullptr) {
+          if(res.get()->curVar->status == VariableStatus::Uninited) {
+            errors.push_back(createSemanticError(varDef, "未初期化の値を代入しようとしています。"));
           }
-          else {
-            res.get()->status = RegisterStatus::Moved;
-            reg = new Register();
-            (*flow)->addReg(reg);
-            auto inst = new MovInstruction();
-            inst->dist = reg;
-            inst->src = res.get();
-            (*flow)->insts.push_back(inst);
+          else if(res.get()->curVar->status == VariableStatus::Moved) {
+            errors.push_back(createSemanticError(varDef, "既に移動された値を代入しようとしています。"));
           }
-          reg->mut = varDef->isMut ? Mutability::Mutable : Mutability::Immutable;
-          reg->status = RegisterStatus::InUse;
-          reg->vType = ValueType::LeftValue;
-          reg->type = Type::merge(Mov, expectedType, res.get()->type);
-          reg->scope = RegisterScope::LocalVariable;
-          (*flow)->vars[varDef->name->name] = reg;
+          res.get()->curVar->status = VariableStatus::Moved;
         }
+        reg = res.get();
       }
       else {
         errors += res.err();
@@ -49,13 +33,15 @@ namespace pickc::pcir
     }
     else {
       reg = new Register();
-      reg->mut = varDef->isMut ? Mutability::Mutable : Mutability::Immutable;
-      reg->status = RegisterStatus::Uninited;
-      reg->vType = ValueType::LeftValue;
       reg->type = expectedType;
-      reg->scope = RegisterScope::LocalVariable;
-      (*flow)->vars[varDef->name->name] = reg;
     }
+    (*flow)->vars.insert(new Variable{
+      varDef->name->name,
+      varDef->isMut ? Mutability::Mutable : Mutability::Immutable,
+      VariableStatus::InUse,
+      expectedType,
+      reg
+    });
     if(errors.empty()) return ok(reg);
     return error(errors);
   }

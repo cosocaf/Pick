@@ -24,6 +24,7 @@ namespace pickc::pcir
     Result<Register*, std::vector<std::string>> binaryAnalyze(const parser::BinaryNode* binary, FlowNode** flow);
     Result<Register*, std::vector<std::string>> varDefAnalyze(const parser::VariableDefineNode* varDef, FlowNode** flow);
     Result<Register*, std::vector<std::string>> fnDefAnalyze(const parser::FunctionDefineNode* fnDef, FlowNode** flow);
+    Result<Register*, std::vector<std::string>> ifAnalyze(const parser::IfNode* ifNode, FlowNode** flow);
     Symbol* findGlobalVar(const parser::VariableNode* var);
   public:
     ModuleAnalyzer(SemanticAnalyzer* sa, ModuleTree* tree);

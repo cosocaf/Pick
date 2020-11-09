@@ -12,6 +12,18 @@ namespace pickc::parser
       nodes[i]->dump(indent2 + "+--", indent2 + (i + 1 < l ? "|  " : "   "));
     }
   }
+  void IfNode::dump(const std::string& indent, const std::string& indent2) const
+  {
+    std::cout << indent << "If" << std::endl;
+    std::cout << indent2 << "+--Comp" << std::endl;
+    comp->dump(indent2 + "|  +--", indent2 + "|     ");
+    std::cout << indent2 << "+--Then" << std::endl;
+    thenExpr->dump(indent2 + (elseExpr ? "|  " : "   ") + "+--", indent2 + (elseExpr ? "|  " : "   ") + "   ");
+    if(elseExpr) {
+      std::cout << indent2 << "+--Else" << std::endl;
+      elseExpr->dump(indent2 + "   +--", indent2 + "      ");
+    }
+  }
   IntegerLiteral::IntegerLiteral(int value) : value(value) {}
   void IntegerLiteral::dump(const std::string& indent, const std::string&) const
   {
@@ -260,6 +272,11 @@ namespace pickc::parser
   void MinusNode::dump(const std::string& indent, const std::string& indent2) const
   {
     std::cout << indent << "Minus" << std::endl;
+    base->dump(indent2 + "+--", indent2 + "   ");
+  }
+  void CopyNode::dump(const std::string& indent, const std::string& indent2) const
+  {
+    std::cout << indent << "Copy" << std::endl;
     base->dump(indent2 + "+--", indent2 + "   ");
   }
   void FrontIncrementNode::dump(const std::string& indent, const std::string& indent2) const

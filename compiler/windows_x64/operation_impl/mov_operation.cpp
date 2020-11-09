@@ -60,6 +60,7 @@ namespace pickc::windows::x64
         }
       }
       else if(src.type == OperandType::Immediate) {
+        if(dist.reg >= Register::R8 && dist.reg <= Register::R15) rex |= REXB;
         if(size == OperationSize::Byte) {
           opcode.push_back(0xB0 | modRM(Register::RAX, dist.reg));
           operand << static_cast<uint8_t>(src.imm);
@@ -88,8 +89,8 @@ namespace pickc::windows::x64
     else if(dist.type == OperandType::Memory) {
       if(src.type == OperandType::Register) {
         if(src.reg >= Register::RSP && src.reg <= Register::RDI) rex |= REX;
-        if(dist.memory.base.get() >= Register::R8 && dist.memory.base.get() <= Register::R15) rex |= REXR;
-        if(src.reg >= Register::R8 && src.reg <= Register::R15) rex |= REXB;
+        if(dist.memory.base.get() >= Register::R8 && dist.memory.base.get() <= Register::R15) rex |= REXB;
+        if(src.reg >= Register::R8 && src.reg <= Register::R15) rex |= REXR;
         if(size == OperationSize::Byte) opcode.push_back(0x88);
         else opcode.push_back(0x89);
         uint8_t mod = 0;

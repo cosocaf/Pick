@@ -8,7 +8,7 @@
 
 namespace pickc::windows::x64
 {
-  Compiler::Compiler(const ssa::SSABundle& bundle) : bundle(bundle) {}
+  Compiler::Compiler(const bundler::Bundle& bundle) : bundle(bundle) {}
   Result<WindowsX64, std::vector<std::string>> Compiler::compile(const CompilerOption& option)
   {
     std::vector<std::string> errors;
@@ -38,10 +38,10 @@ namespace pickc::windows::x64
     x64.invokeMain->code.push_back(new PushOperation(Operand(Register::RBP)));
     x64.invokeMain->code.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RBP), Operand(Register::RSP)));
     for(auto& symbol : bundle.symbols) {
-      x64.symbols[symbol] = 0;
-      x64.invokeMain->code.push_back(new CallOperation(x64.invokeMain, Operand(Relocation(symbol->init))));
-      x64.invokeMain->code.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RCX), Operand(Relocation(symbol))));
-      auto size = x64.typeTable[symbol->type].getSize();
+      x64.symbols[symbol.first] = 0;
+      x64.invokeMain->code.push_back(new CallOperation(x64.invokeMain, Operand(Relocation(symbol.first->init))));
+      x64.invokeMain->code.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RCX), Operand(Relocation(symbol.first))));
+      auto size = x64.typeTable[symbol.first->type].getSize();
       switch(size) {
         case 8:
           x64.invokeMain->code.push_back(new MovOperation(OperationSize::Byte, Operand(Memory(Register::RCX, 1, true)), Operand(Register::RAX)));

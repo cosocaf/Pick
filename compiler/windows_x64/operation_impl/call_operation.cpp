@@ -2,7 +2,7 @@
 
 namespace pickc::windows::x64
 {
-  CallOperation::CallOperation(Routine* from, const Operand& fn) : Operation(OperationSize::QWord), from(from), fn(fn) {
+  CallOperation::CallOperation(Routine* from, Operand fn) : Operation(OperationSize::QWord), from(from), fn(fn) {
     // 絶対アドレスでのコールは現状対応しない。
     // OS作るとかなら使うが、ソフトウェアを作る限りはまず使用しない。
     assert(fn.type != OperandType::Immediate);

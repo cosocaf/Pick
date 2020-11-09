@@ -3,6 +3,7 @@
 
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "parser/ast_node.h"
 #include "pcir_code.h"
@@ -96,6 +97,7 @@ namespace pickc::pcir
     Type(const Type& type);
     ~Type();
     Type& operator=(const Type& type);
+    // setのinsert用
     bool operator<(const Type& type) const;
     static bool castable(const Type& to, const Type& from);
     static bool computable(uint8_t inst, const Type* left, const Type* right = nullptr);
@@ -129,14 +131,20 @@ namespace pickc::pcir
     Argument,
     GlobalVariable,
   };
+  struct Variable;
   struct Register
   {
-    Mutability mut;
-    ValueType vType;
     Type type;
-    RegisterStatus status;
-    RegisterScope scope; 
+    Variable* curVar;
   };
+  // struct RegisterX
+  // {
+  //   Mutability mut;
+  //   ValueType vType;
+  //   Type type;
+  //   RegisterStatus status;
+  //   RegisterScope scope;
+  // };
 
   struct FlowNode;
   struct Function;
@@ -152,6 +160,12 @@ namespace pickc::pcir
     Mul,
     Div,
     Mod,
+    EQ,
+    NEQ,
+    GT,
+    GE,
+    LT,
+    LE
   };
   struct BinaryInstruction : public Instruction
   {
@@ -197,11 +211,6 @@ namespace pickc::pcir
     Register* fn;
     std::vector<Register*> args;
   };
-  struct ReturnInstruction : public Instruction
-  {
-    // RetVであればnullptr
-    Register* reg;
-  };
   struct LoadFnInstruction : public Instruction
   {
     Register* reg;
@@ -223,17 +232,48 @@ namespace pickc::pcir
     Register* dist;
     Register* src;
   };
+  struct PhiInstruction : public Instruction
+  {
+    Register* dist;
+    Register* r1;
+    Register* r2;
+  };
 
   struct Function;
+  enum struct VariableStatus
+  {
+    Uninited,
+    InUse,
+    Moved,
+  };
+  struct Variable
+  {
+    std::string name;
+    Mutability mut;
+    VariableStatus status;
+    Type type;
+    Register* reg;
+  };
+  enum struct FlowType
+  {
+    Normal,
+    ConditionalBranch,
+    EndPoint,
+  };
   struct FlowNode
   {
+    FlowType type;
     Function* belong;
     FlowNode* parentFlow;
-    FlowNode* nextFlow;
     std::vector<Instruction*> insts;
-    std::unordered_map<std::string, Register*> vars;
+    std::unordered_set<Variable*> vars;
+    FlowNode* nextFlow;
+    Register* cond;
+    FlowNode* thenFlow;
+    FlowNode* elseFlow;
+    Register* retReg;
     Register* result;
-    Register* findVar(const std::string& name) const;
+    Variable* findVar(const std::string& name) const;
     Option<std::string> retNotice(const Type& t) const;
     void addReg(Register* reg);
   };

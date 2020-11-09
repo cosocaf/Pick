@@ -4,7 +4,7 @@
 #include "compiler_option.h"
 #include "parser/parser.h"
 #include "pcir/semantic_analyzer.h"
-#include "ssa/converter.h"
+#include "bundler/bundler.h"
 #include "windows_x64/compiler.h"
 #include "windows_x64/linker.h"
 
@@ -34,12 +34,12 @@ int main(char argc, char* argv[])
     }
     return STATUS_PCIR_ERROR;
   }
-  auto bundle = ssa::SSAConverter().convert(option.get());
+  auto bundle = bundler::Bundler().bundle(option.get());
   if(!bundle) {
     for(const auto& err : bundle.err()) {
       std::cout << CONSOLE_FG_RED << err << CONSOLE_DEFAULT << std::endl;
     }
-    return STATUS_SSA_ERROR;
+    return STATUS_BUNDLER_ERROR;
   }
   switch(option.get().target) {
     case TargetPlatforms::WindowsX64: {

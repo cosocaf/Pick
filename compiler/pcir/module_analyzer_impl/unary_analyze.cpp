@@ -12,42 +12,40 @@ namespace pickc::pcir
     std::vector<std::string> errors;
     const auto incdec = [&](uint8_t code, UnaryInstructions uinst, bool isFront) {
       if(auto base = exprAnalyze(unary->base, flow)) {
-        if(base.get()->vType == ValueType::RightValue || base.get()->mut == Mutability::Mutable) {
-          errors.push_back(createSemanticError(unary, "値はミュータブルな左辺値である必要があります。"));
-          return;
+        if(base.get()->curVar == nullptr) {
+          errors.push_back(createSemanticError(unary, "値は左辺値である必要があります。"));
         }
-        if(base.get()->status == RegisterStatus::Uninited) {
+        else if(base.get()->curVar->mut == Mutability::Mutable) {
+          errors.push_back(createSemanticError(unary, "値はミュータブルである必要があります。"));
+        }
+        else if(base.get()->curVar->status == VariableStatus::Uninited) {
           errors.push_back(createSemanticError(unary, "初期化されていない変数です。"));
-          return;
         }
-        if(base.get()->status == RegisterStatus::Moved) {
+        if(base.get()->curVar->status == VariableStatus::Moved) {
           errors.push_back(createSemanticError(unary, "既に移動されている変数です。"));
-          return;
         }
-        if(!Type::computable(code, &base.get()->type)) {
+        else if(!Type::computable(code, &base.get()->type)) {
           errors.push_back(createSemanticError(unary, "不正な型です。"));
-          return;
-        }
-        Register* baseReg;
-        Register* distReg;
-        if(isFront) {
-          reg = baseReg = distReg = base.get();
         }
         else {
-          reg = baseReg = base.get();
-          distReg = new Register();
-          distReg->mut = Mutability::Mutable;
-          distReg->status = RegisterStatus::InUse;
-          distReg->vType = ValueType::RightValue;
-          distReg->type = baseReg->type;
-          distReg->scope = RegisterScope::LocalVariable;
-          (*flow)->addReg(distReg);
+          Register* baseReg;
+          Register* distReg;
+          if(isFront) {
+            reg = baseReg = distReg = base.get();
+          }
+          else {
+            reg = baseReg = base.get();
+            distReg = new Register();
+            distReg->type = baseReg->type;
+            base.get()->curVar->reg = distReg;
+            (*flow)->addReg(distReg);
+          }
+          auto inst = new UnaryInstruction();
+          inst->inst = uinst;
+          inst->reg = baseReg;
+          inst->dist = distReg;
+          (*flow)->insts.push_back(inst);
         }
-        auto inst = new UnaryInstruction();
-        inst->inst = uinst;
-        inst->reg = baseReg;
-        inst->dist = distReg;
-        (*flow)->insts.push_back(inst);
       }
       else {
         errors += base.err();
@@ -58,20 +56,18 @@ namespace pickc::pcir
         if(!Type::computable(code, &base.get()->type)) {
           errors.push_back(createSemanticError(unary, "不正な型です。"));
         }
-        else if(base.get()->status == RegisterStatus::Uninited) {
-          errors.push_back(createSemanticError(unary, "初期化されていない変数です。"));
-        }
-        else if(base.get()->status == RegisterStatus::Moved) {
-          errors.push_back(createSemanticError(unary, "既に移動されている変数です。"));
-        }
         else {
           reg = new Register();
-          reg->mut = Mutability::Mutable;
-          reg->status = RegisterStatus::InUse;
-          reg->vType = ValueType::RightValue;
           reg->type = base.get()->type;
-          reg->scope = RegisterScope::LocalVariable;
           (*flow)->addReg(reg);
+          if(base.get()->curVar != nullptr) {
+            if(base.get()->curVar->status == VariableStatus::Uninited) {
+              errors.push_back(createSemanticError(unary, "初期化されていない変数です。"));
+            }
+            else if(base.get()->curVar->status == VariableStatus::Moved) {
+              errors.push_back(createSemanticError(unary, "既に移動されている変数です。"));
+            }
+          }
           auto inst = new UnaryInstruction();
           inst->inst = uinst;
           inst->dist = reg;
@@ -112,11 +108,13 @@ namespace pickc::pcir
     else if(instanceof<CallNode>(unary)) {
       auto call = dynamic_cast<const CallNode*>(unary);
       if(auto fn = exprAnalyze(call->base, flow)) {
-        if(fn.get()->status == RegisterStatus::Uninited) {
-          errors.push_back(createSemanticError(call->base, "初期化されていない変数です。"));
-        }
-        else if(fn.get()->status == RegisterStatus::Moved) {
-          errors.push_back(createSemanticError(call->base, "既に移動された変数です。"));
+        if(fn.get()->curVar != nullptr) {
+          if(fn.get()->curVar->status == VariableStatus::Uninited) {
+            errors.push_back(createSemanticError(call->base, "初期化されていない変数です。"));
+          }
+          else if(fn.get()->curVar->status == VariableStatus::Moved) {
+            errors.push_back(createSemanticError(call->base, "既に移動された変数です。"));
+          }
         }
         else if(!fn.get()->type.isFn()) {
           errors.push_back(createSemanticError(call->base, "関数ではありません。"));
@@ -138,11 +136,7 @@ namespace pickc::pcir
           }
           if(errors.empty()) {
             reg = new Register();
-            reg->mut = Mutability::Mutable;
-            reg->status = RegisterStatus::InUse;
-            reg->vType = ValueType::RightValue;
             reg->type = *fn.get()->type.fn.retType;
-            reg->scope = RegisterScope::LocalVariable;
             (*flow)->addReg(reg);
             auto inst = new CallInstruction();
             inst->fn = fn.get();

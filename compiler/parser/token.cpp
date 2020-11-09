@@ -96,7 +96,7 @@ namespace pickc::parser
         else if (std::regex_match(buf, match, std::regex(R"(^\d+?\.?\d+(e[\-+]?\d+)?$)"))) kind = TokenKind::Float;
         else if (std::regex_match(buf, match, std::regex(R"(^\d+?\.?\d+(e[\-+]?\d+)?f32$)"))) kind = TokenKind::F32;
         else if (std::regex_match(buf, match, std::regex(R"(^\d+?\.?\d+(e[\-+]?\d+)?f64$)"))) kind = TokenKind::F64;
-        else if (std::regex_match(buf, match, std::regex(R"(^[^\s!-?\[-\^`\{-~][^\s!-/:-?\[-\^`\{-~]*$)"))) kind = TokenKind::Identify;
+        else if (std::regex_match(buf, match, std::regex(R"(^[^\s!-@\[-\^`\{-~][^\s!-/:-@\[-\^`\{-~]*$)"))) kind = TokenKind::Identify;
         else {
           errors.push_back("エラー: " + buf + " は不正な文字です。\n    at " + sequence.file + " " + std::to_string(line + 1) + "行目, " + std::to_string(letter - buf.size() + 1) + "文字目");
           return;
@@ -146,6 +146,10 @@ namespace pickc::parser
           case ',':
             clearBuf();
             sequence.tokens.push_back(Token(TokenKind::Comma, ",", line + 1, letter + 1));
+            break;
+          case '@':
+            clearBuf();
+            sequence.tokens.push_back(Token(TokenKind::Copy, "@", line + 1, letter + 1));
             break;
           case '+':
             clearBuf();

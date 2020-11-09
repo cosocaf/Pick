@@ -6,6 +6,10 @@
 namespace pickc::pcir
 {
   /**
+   * SSA実現のためdistレジスタはすべて未使用でなければならない。
+  */
+
+  /**
    * Add
    * 加算命令。dist = left + right
    * dist, left, rightの型は符号付き整数型または符号なし整数型または浮動小数型であり、型をそろえる必要がある。
@@ -70,6 +74,42 @@ namespace pickc::pcir
   */
   constexpr uint8_t Neg = 0x08;
   /**
+   * EQ
+   * 等比較命令。dist = r1 == r2
+   * EQ dist(u32, index of regs) r1(u32, index of regs) r2(u32, index of regs)
+  */
+  constexpr uint8_t EQ = 0x09;
+  /**
+   * NEQ
+   * 不等比較命令。dist = r1 != r2
+   * NEQ dist(u32, index of regs) r1(u32, index of regs) r2(u32, index of regs)
+  */
+  constexpr uint8_t NEQ = 0x0A;
+  /**
+   * GT
+   * 大なり比較命令。dist = r1 > r2
+   * GT dist(u32, index of regs) r1(u32, index of regs) r2(u32, index of regs)
+  */
+  constexpr uint8_t GT = 0x0B;
+  /**
+   * GE
+   * 大なり等比較命令。dist = r1 >= r2
+   * GE dist(u32, index of regs) r1(u32, index of regs) r2(u32, index of regs)
+  */
+  constexpr uint8_t GE = 0x0C;
+  /**
+   * LT
+   * 小なり比較命令。dist = r1 < r2
+   * LT dist(u32, index of regs) r1(u32, index of regs) r2(u32, index of regs)
+  */
+  constexpr uint8_t LT = 0x0D;
+  /**
+   * LE
+   * 小なり等比較命令。dist = r1 <= r2
+   * LE dist(u32, index of regs) r1(u32, index of regs) r2(u32, index of regs)
+  */
+  constexpr uint8_t LE = 0x0E;
+  /**
    * Imm
    * 即値確保命令。dist = imm
    * immのバイト数はdistの型の大きさにする必要がある。
@@ -83,19 +123,6 @@ namespace pickc::pcir
    * Call dist(u32, index of regs) fn(u32, index of regs) [args(u32, index of regs)]
   */
   constexpr uint8_t Call = 0x20;
-  /**
-   * Ret
-   * リターン命令。return reg
-   * void型のリターンはRetVを使用する。
-   * Ret reg(u32, index of regs)
-  */
-  constexpr uint8_t Ret = 0x21;
-  /**
-   * RetV
-   * voidリターン命令。return
-   * RetV
-  */
-  constexpr uint8_t RetV = 0x22;
   /**
    * LoadFn
    * 関数テーブルから関数を読み込む。fn = fnTable[index]
@@ -123,6 +150,14 @@ namespace pickc::pcir
    * Mov dist(u32, index of regs) src(u32, index of regs)
   */
   constexpr uint8_t Mov = 0x40;
+  /**
+   * Phi
+   * φ命令。二つのレジスタを同一のレジスタとしてみなす。
+   * 各レジスタの定義されるフローは条件分岐などによって独立していなければならず、
+   * 親子関係であってはならない。
+   * Phi dist(u32, index of regs) r1(u32, index of regs) r2(u32, index of regs)
+  */
+  constexpr uint8_t Phi = 0x41;
 }
 
 #endif // PICKC_PCIR_PCIR_CODE_H_

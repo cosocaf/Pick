@@ -2,7 +2,7 @@
 #define PICKC_UTILS_VECTOR_UTILS_H_
 
 #include <vector>
-
+#include <cassert>
 namespace pickc
 {
   template<typename T>
@@ -24,6 +24,12 @@ namespace pickc
   inline bool includes(const std::vector<T>& vec, const T& value)
   {
     return std::find(vec.begin(), vec.end(), value) != vec.end();
+  }
+  template<typename T>
+  size_t indexOf(const std::vector<T>& vec, const T& value)
+  {
+    assert(std::find(vec.begin(), vec.end(), value) != vec.end());
+    return std::distance(vec.begin(), std::find(vec.begin(), vec.end(), value));
   }
 }
 

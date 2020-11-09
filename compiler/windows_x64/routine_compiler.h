@@ -6,7 +6,7 @@
 #include "utils/result.h"
 #include "utils/binary_vec.h"
 #include "utils/option.h"
-#include "ssa/ssa_struct.h"
+#include "bundler/function.h"
 
 #include "routine.h"
 
@@ -14,6 +14,8 @@ namespace pickc::windows::x64
 {
   enum struct RegisterInfo
   {
+    // ルーチン自身の引数
+    Argument,
     // ルーチン中で一度も使用していない。
     Unused,
     // ルーチン中で現在使用中。
@@ -79,9 +81,9 @@ namespace pickc::windows::x64
     // バイト単位での使用状況を保持し、
     // trueなら使用中、falseなら不使用を表す。
     std::vector<bool> stackStatus;
-    size_t curLifeTime;
+    std::unordered_map<bundler::Register*, Operand> regs;
     std::unordered_map<Register, RegisterInfo> regInfo;
-    std::unordered_map<ssa::SSARegister*, Operand> regs;
+    // std::unordered_map<ssa::SSARegister*, Operand> regs;
     std::vector<Operand> args;
     // 現在のスタックの伸び
     int32_t stack;
@@ -89,13 +91,15 @@ namespace pickc::windows::x64
     int32_t minStack;
     Operand createOperand();
     // スタックを確保する。
+    // スタック領域を線形探索し、numBytes以上の領域が使用可能であればその領域を指すメモリを返す。
+    // 空き領域がなければスタックを伸ばし、その領域を指すメモリを返す。
     // 現状フラグメンテーションは無視する。
     Memory allocStack(size_t numBytes);
     void saveRegs();
     void freeRegs();
     OperationSize getSize(const pcir::TypeSection* type);
   public:
-    RoutineCompiler(const ssa::SSAFunction& ssaFn);
+    RoutineCompiler(bundler::Function* fn);
     Result<Routine*, std::vector<std::string>> compile();
   };
 }

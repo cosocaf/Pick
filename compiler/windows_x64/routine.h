@@ -2,7 +2,7 @@
 #define PICKC_WINDOWS_X64_ROUTINE_H_
 
 #include "utils/binary_vec.h"
-#include "ssa/ssa_struct.h"
+#include "bundler/function.h"
 #include "type.h"
 
 namespace pickc::windows::x64
@@ -191,6 +191,7 @@ namespace pickc::windows::x64
     _NONE,
     Symbol,
     Function,
+    JmpTo,
   };
   struct Relocation
   {
@@ -198,9 +199,11 @@ namespace pickc::windows::x64
     union {
       pcir::SymbolSection* symbol;
       pcir::FunctionSection* fn;
+      size_t jmpTo;
     };
     explicit Relocation(pcir::SymbolSection* symbol);
     explicit Relocation(pcir::FunctionSection* fn);
+    explicit Relocation(size_t jmpTo);
     Relocation(const Relocation& reloc);
     Relocation& operator=(const Relocation& reloc);
     ~Relocation();
@@ -257,7 +260,7 @@ namespace pickc::windows::x64
     // ADD, OR, ADC, SBB, AND, SUB, XOR, CMP用テンプレート
     BinaryVec binaryOpTemplate(Routine* routine, uint8_t ebgb, uint8_t evgv, uint8_t gbeb, uint8_t gvev, uint8_t alib, uint8_t axiz, uint8_t immop);
   public:
-    BinaryOperation(OperationSize size, const Operand& dist, const Operand& src);
+    BinaryOperation(OperationSize size, Operand dist, Operand src);
   };
   class AddOperation : public BinaryOperation
   {
@@ -266,6 +269,13 @@ namespace pickc::windows::x64
     virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
   };
   class SubOperation : public BinaryOperation
+  {
+  public:
+    using BinaryOperation::BinaryOperation;
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+
+  class CmpOperation : public BinaryOperation
   {
   public:
     using BinaryOperation::BinaryOperation;
@@ -285,15 +295,54 @@ namespace pickc::windows::x64
     Routine* from;
     Operand fn;
   public:
-    CallOperation(Routine* from, const Operand& fn);
+    CallOperation(Routine* from, Operand fn);
     virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
   };
 
+  // 無条件ジャンプ
   class JmpOperation : public Operation
   {
-    pcir::FlowStruct* to;
+  protected:
+    // bundler上のインデックスであり、x64のインデックスでないことに注意。
+    size_t to;
   public:
-    JmpOperation(pcir::FlowStruct* to);
+    JmpOperation(size_t to);
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+  class JeOperation : public JmpOperation
+  {
+  public:
+    using JmpOperation::JmpOperation;
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+  class JneOperation : public JmpOperation
+  {
+  public:
+    using JmpOperation::JmpOperation;
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+  class JgOperation : public JmpOperation
+  {
+  public:
+    using JmpOperation::JmpOperation;
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+  class JgeOperation : public JmpOperation
+  {
+  public:
+    using JmpOperation::JmpOperation;
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+  class JlOperation : public JmpOperation
+  {
+  public:
+    using JmpOperation::JmpOperation;
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+  class JleOperation : public JmpOperation
+  {
+  public:
+    using JmpOperation::JmpOperation;
     virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
   };
 
@@ -301,14 +350,14 @@ namespace pickc::windows::x64
   {
     Operand value;
   public:
-    explicit PushOperation(const Operand& value);
+    explicit PushOperation(Operand value);
     virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
   };
   class PopOperation : public Operation
   {
     Operand dist;
   public:
-    explicit PopOperation(const Operand& dist);
+    explicit PopOperation(Operand dist);
     virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
   };
 
@@ -350,7 +399,7 @@ namespace pickc::windows::x64
 
   struct Routine
   {
-    ssa::SSAFunction ssaFn;
+    bundler::Function* fn;
     std::vector<Operation*> code;
     BinaryVec nativeCode;
     // exeファイル内のこのルーチンが配置されるアドレス。
@@ -358,6 +407,8 @@ namespace pickc::windows::x64
     // codeごとのnativeCode内の開始アドレス
     // これとaddressを組み合わせて再配置を行う。
     std::unordered_map<Operation*, size_t> codeIndexes;
+    // bundle命令とOperationのアドレス対応表
+    std::vector<size_t> bundleIndexes;
     // 非volatileなレジスタを保存したり、RSPをアラインメントしたりした時のスタックのずれ
     int32_t baseDiff;
   };
@@ -367,7 +418,7 @@ namespace pickc::windows::x64
     // mainを呼び出すプログラム全体の初期化用関数。
     // ここでグローバル変数の初期化を行う。
     Routine* invokeMain;
-    // シンボルセクションと、それに対応するシンボルが配置されるアドレス。
+    // シンボルと、それに対応するシンボルが配置されるアドレス。
     std::map<pcir::SymbolSection*, uint64_t> symbols;
     // 関数セクションと、ネイティブ関数
     std::map<pcir::FunctionSection*, Routine*> routines;

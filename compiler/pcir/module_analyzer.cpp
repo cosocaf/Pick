@@ -3,6 +3,7 @@
 #include "pickc/config.h"
 #include "utils/vector_utils.h"
 #include "utils/instanceof.h"
+#include "utils/dyn_cast.h"
 
 #include "semantic_analyzer.h"
 
@@ -71,13 +72,16 @@ namespace pickc::pcir
     std::vector<std::string> errors;
     for(const auto& node : tree->ast.nodes) {
       if(instanceof<FunctionDefineNode>(node)) {
-        auto fn = dynamic_cast<FunctionDefineNode*>(node);
+        auto fn = dynCast<FunctionDefineNode>(node);
         if(fn->name == nullptr) continue;
         if(tree->module.symbols.find(fn->name->name) == tree->module.symbols.end()) {
           auto symbol = new Symbol();
           symbol->name = fn->name->name;
           symbol->fullyQualifiedName = tree->name + "::" + symbol->name;
-          symbol->type = Types::Any;
+          TypeFunction tf{};
+          tf.retType = new Type(fn->retType);
+          for(const auto& arg : fn->args) tf.args.push_back(new Type(arg->type));
+          symbol->type = tf;
           symbol->scope = fn->isPub ? Scope::Public : Scope::Private;
           symbol->mut = Mutability::Immutable;
           symbol->expr = fn;
@@ -87,7 +91,7 @@ namespace pickc::pcir
         else errors.push_back(createSemanticError(fn->name, "既にシンボル " + fn->name->name + " は存在します。"));
       }
       else if(instanceof<VariableDefineNode>(node)) {
-        auto var = dynamic_cast<VariableDefineNode*>(node);
+        auto var = dynCast<VariableDefineNode>(node);
         if(tree->module.symbols.find(var->name->name) == tree->module.symbols.end()) {
           auto symbol = new Symbol();
           symbol->name = var->name->name;
@@ -130,7 +134,8 @@ namespace pickc::pcir
     for(auto& symbol : tree->module.symbols) {
       if(!symbol.second->init) {
         symbol.second->init = new Function();
-        if(auto init = exprAnalyze(symbol.second->expr, &symbol.second->init->entryFlow)) {
+        auto curFlow = symbol.second->init->entryFlow;
+        if(auto init = exprAnalyze(symbol.second->expr, &curFlow)) {
           assert(symbol.second->init->flows.size() == 1);
           if(init.get()) {
             symbol.second->init->result = init.get();
@@ -142,9 +147,8 @@ namespace pickc::pcir
               TypeFunction tf{};
               tf.retType = new Type(init.get()->type);
               symbol.second->init->type = tf;
-              auto ret = new ReturnInstruction();
-              ret->reg = init.get();
-              symbol.second->init->entryFlow->insts.push_back(ret);
+              curFlow->type = FlowType::EndPoint;
+              curFlow->retReg = init.get();
             }
             tree->module.functions.push_back(symbol.second->init);
           }

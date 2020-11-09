@@ -153,6 +153,7 @@ namespace pickc::windows::x64
   }
   Relocation::Relocation(pcir::SymbolSection* symbol) : type(RelocationType::Symbol), symbol(symbol) {}
   Relocation::Relocation(pcir::FunctionSection* fn) : type(RelocationType::Function), fn(fn) {}
+  Relocation::Relocation(size_t jmpTo) : type(RelocationType::JmpTo), jmpTo(jmpTo) {}
   Relocation::Relocation(const Relocation& reloc) : type(reloc.type)
   {
     switch(type) {
@@ -163,6 +164,9 @@ namespace pickc::windows::x64
         break;
       case RelocationType::Function:
         fn = reloc.fn;
+        break;
+      case RelocationType::JmpTo:
+        jmpTo = reloc.jmpTo;
         break;
       default:
         assert(false);
@@ -179,6 +183,9 @@ namespace pickc::windows::x64
         break;
       case RelocationType::Function:
         fn = reloc.fn;
+        break;
+      case RelocationType::JmpTo:
+        jmpTo = reloc.jmpTo;
         break;
       default:
         assert(false);

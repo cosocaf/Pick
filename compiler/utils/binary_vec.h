@@ -31,6 +31,9 @@ namespace pickc
   uint16_t get16(const BinaryVec& vec, size_t& i);
   uint32_t get32(const BinaryVec& vec, size_t& i);
   uint64_t get64(const BinaryVec& vec, size_t& i);
+  float getF32(const BinaryVec& vec, size_t& i);
+  double getF64(const BinaryVec& vec, size_t& i);
+  BinaryVec subVec(const BinaryVec& vec, size_t& i, size_t len);
 }
 
 #endif // PICKC_UTILS_BINARY_VEC_H_

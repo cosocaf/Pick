@@ -49,4 +49,21 @@ namespace pickc
     u64 |= (static_cast<uint64_t>(vec[++i]) << 56);
     return u64;
   }
+  float getF32(const BinaryVec& vec, size_t& i)
+  {
+    return *reinterpret_cast<float*>(&subVec(vec, i, 4)[0]);
+  }
+  double getF64(const BinaryVec& vec, size_t& i)
+  {
+    return *reinterpret_cast<double*>(&subVec(vec, i, 8)[0]);
+  }
+  BinaryVec subVec(const BinaryVec& vec, size_t& i, size_t len)
+  {
+    BinaryVec result;
+    result.reserve(len);
+    for(size_t count = 0; count < len; ++count, ++i) {
+      result.push_back(vec[i]);
+    }
+    return result;
+  }
 }

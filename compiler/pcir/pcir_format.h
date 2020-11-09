@@ -31,8 +31,11 @@ namespace pickc::pcir
   constexpr uint32_t TYPE_GENERICS = 0x00000200;
 
   // 通常のフローであることを表す。
-  constexpr uint32_t FLOW_TYPE_NORMAL = 0x00000000;
-
+  constexpr uint32_t FLOW_TYPE_NORMAL = 0x00000001;
+  // 条件分岐フローであることを表す。
+  constexpr uint32_t FLOW_TYPE_COND_BRANCH = 0x00000002;
+  // エンドポイントフローであることを表す。
+  constexpr uint32_t FLOW_TYPE_END_POINT = 0x00000004;
 
   struct PCIRFileHeader
   {
@@ -173,14 +176,27 @@ namespace pickc::pcir
   {
     uint32_t flowType;                    // FLOW_TYPE_*
     uint32_t indexOfParentFlow;           // Index of parent flow. If not, set it to -1(0xFFFFFFFF).
-    // PCIRNormalBlock normal;            // if flowType == FLOW_TYPE_NORMAL
+    // PCIRNormalFlow normal;             // if flowType == FLOW_TYPE_NORMAL
+    // PCIRCondBranchFlow condBranchFlow; // if flowType == FLOW_TYPE_COND_BRANCH
+    // PCIREndPointFlow;                  // if flowType == FLOW_TYPE_END_POINT
+    uint32_t sizeOfCodes;                 // Size of codes.
+    // uint8_t[sizeOfCodes];              // codes. 
   };
   struct PCIRNormalFlow
   {
     uint32_t indexOfNextFlow;             // Index of next flow. If not, set it to -1(0xFFFFFFFF).
-    uint32_t sizeOfCodes;                 // Size of codes.
-    // uint8_t[sizeOfCodes];              // codes. 
   };
+  struct PCIRCondBranchFlow
+  {
+    uint32_t indexOfCondReg;              // Index of cond register.
+    uint32_t indexOfThenFlow;             // Index of then flow.
+    uint32_t indexOfElseFlow;             // Index of else flow.
+  };
+  struct PCIREndPointFlow
+  {
+    uint32_t indexOfRetReg;               // Index of return register. If not, set it to -1(0xFFFFFFFF).
+  };
+
   struct PCIRFunction
   {
     uint32_t type;                        // Index of type in type section.

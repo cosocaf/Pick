@@ -2,7 +2,7 @@
 
 namespace pickc::windows::x64
 {
-  PushOperation::PushOperation(const Operand& value) : Operation(OperationSize::QWord), value(value) {}
+  PushOperation::PushOperation(Operand value) : Operation(OperationSize::QWord), value(value) {}
   BinaryVec PushOperation::bin(WindowsX64& x64, Routine* routine)
   {
     if(value.type == OperandType::Memory && value.memory.base && value.memory.base.get() == Register::RBP && value.memory.needAddressFix) {
@@ -73,7 +73,7 @@ namespace pickc::windows::x64
     return code;
   }
 
-  PopOperation::PopOperation(const Operand& dist) : Operation(OperationSize::QWord), dist(dist) {}
+  PopOperation::PopOperation(Operand dist) : Operation(OperationSize::QWord), dist(dist) {}
   BinaryVec PopOperation::bin(WindowsX64& x64, Routine* routine)
   {
     // TODO

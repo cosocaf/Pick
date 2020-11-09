@@ -220,6 +220,10 @@ namespace pickc::windows::x64
           relocs[rva].base.sizeOfBlock += 2;
           relocs[rva].rva.push_back(0x3000 | ((vaddress) & 0x0FFF));
           break;
+        case RelocationType::JmpTo: {
+          value = reloc->routine->codeIndexes[reloc->routine->code[reloc->routine->bundleIndexes[reloc->reloc.jmpTo]]] - (reloc->routine->codeIndexes[reloc->op] + reloc->index + 4);
+          break;
+        }
         default:
           assert(false);
       }
@@ -251,43 +255,7 @@ namespace pickc::windows::x64
           assert(false);
       }
     }
-    // uint64_t base = 0;
-    // const auto relocation = [&](Routine* routine) {
-    //   for (auto& reloc : routine->relocs) {
-    //     uint64_t address = 0;
-    //     switch (reloc.type) {
-    //     case x86_64::RelocationType::Function:
-    //       address = x86_64.routines[reloc.indexOfData].address - routine->address - reloc.indexOfRoutine - 4;
-    //       break;
-    //     case x86_64::RelocationType::ConstantSymbol:
-    //       address = x86_64.constSymbols[reloc.indexOfData].address;
-    //       relocTextSection.base.sizeOfBlock += 2;
-    //       relocTextSection.rva.push_back(0x3000 | ((base + reloc.indexOfRoutine) & 0x0FFF));
-    //       break;
-    //     case x86_64::RelocationType::RuntimeSymbol:
-    //       address = x86_64.runtimeSymbols[reloc.indexOfData].address;
-    //       relocTextSection.base.sizeOfBlock += 2;
-    //       relocTextSection.rva.push_back(0x3000 | ((base + reloc.indexOfRoutine) & 0x0FFF));
-    //       break;
-    //     case x86_64::RelocationType::Extern:
-    //       address = libSymbols[reloc.ext].address - routine->address - reloc.indexOfRoutine - 4;
-    //       break;
-    //     default:
-    //       assert(false);
-    //     }
-    //     address += reloc.offset;
-    //     routine->code[reloc.indexOfRoutine] = static_cast<uint8_t>(address);
-    //     routine->code[reloc.indexOfRoutine + 1] = static_cast<uint8_t>(address >> 8);
-    //     routine->code[reloc.indexOfRoutine + 2] = static_cast<uint8_t>(address >> 16);
-    //     routine->code[reloc.indexOfRoutine + 3] = static_cast<uint8_t>(address >> 24);
-    //   }
-    //   base += routine->code.size();
-    // };
-    // relocation(x64.invokeMain);
-    // for (auto& routine : x64.routines) {
-    //     relocation(routine.second);
-    // }
-    
+
     for(auto& reloc : relocs) {
       reloc.second.base.virtualAddress = reloc.first;
       reloc.second.base.sizeOfBlock += sizeof(ImageBaseRelocation);

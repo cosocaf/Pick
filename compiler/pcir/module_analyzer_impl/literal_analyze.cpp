@@ -9,10 +9,6 @@ namespace pickc::pcir
   {
     using namespace parser;
     auto reg = new Register();
-    reg->mut = Mutability::Mutable;
-    reg->status = RegisterStatus::InUse;
-    reg->vType = ValueType::RightValue;
-    reg->scope = RegisterScope::LocalVariable;
     (*flow)->addReg(reg);
     if(instanceof<IntegerLiteral>(literal)) {
       reg->type = Type(Types::I32);
