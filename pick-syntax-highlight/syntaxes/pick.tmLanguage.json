@@ -29,10 +29,10 @@
 					"match": "\\b(pub|pri|extern|import)\\b"
 				},
 				{
-					"match": "\\b(fn)\\s+([^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*)?",
+					"match": "\\b(fn)(\\s+|\\()([^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*)?",
 					"captures": {
 						"1": {"name": "storage.type"},
-						"2": {"name": "entity.name.function"}
+						"3": {"name": "entity.name.function"}
 					}
 				},
 				{
@@ -85,7 +85,7 @@
 				},
 				{
 					"name": "constant.character.pick",
-					"match": "\\b'\\.'\\b"
+					"match": "\\b'.'\\b"
 				}
 			]
 		},
@@ -114,7 +114,7 @@
 			"patterns": [
 				{
 					"name": "variable.language",
-					"match": "\\b(true|false|this|self|void|i8|i16|i32|i64|u8|u16|u32|u64|bool|char)\\b"
+					"match": "\\b(true|false|this|self|void|i8|i16|i32|i64|u8|u16|u32|u64|bool|char|ptr|null)\\b"
 				},
 				{
 					"name": "variable.name",
