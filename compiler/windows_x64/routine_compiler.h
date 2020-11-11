@@ -88,6 +88,7 @@ namespace pickc::windows::x64
     int32_t stack;
     // 最も伸びたスタックの長さ
     int32_t minStack;
+    size_t lifetime;
     Operand createOperand();
     // スタックを確保する。
     // スタック領域を線形探索し、numBytes以上の領域が使用可能であればその領域を指すメモリを返す。

@@ -33,6 +33,7 @@ namespace pickc::windows::x64
 
     stack = 0;
     minStack = 0;
+    lifetime = 0;
 
     for(size_t i = 0, l = routine->fn->type->type.fn.args.size(); i < l; ++i) {
       args.push_back(Operand(Memory(Register::RBP, (routine->fn->type->type.fn.args.size() - i + 1) * 8, 8, false)));
@@ -52,7 +53,9 @@ namespace pickc::windows::x64
 
     for(auto& group : routine->fn->phis) {
       auto operand = Operand(allocStack(8));
+      size_t lifeEnd = 0;
       for(auto& reg : group.second->regs) {
+        lifeEnd = std::max(reg->lifeEnd, lifeEnd);
         if(keyExists(regs, reg)) {
           continue;
         }
@@ -60,6 +63,7 @@ namespace pickc::windows::x64
           regs[reg] = operand;
         }
       }
+      for(auto& reg : group.second->regs) reg->lifeEnd = lifeEnd;
     }
 
     const auto cmpOp = [&](Cond cond, bundler::BinaryInstruction* bin) {
@@ -101,8 +105,9 @@ namespace pickc::windows::x64
         body.push_back(new CmpOperation(getSize(bin->left->type), left, regs[bin->right]));
       }
     };
-    for(size_t i = 0, l = routine->fn->insts.size(); i < l; ++i) {
-      auto inst = routine->fn->insts[i];
+    
+    for(size_t l = routine->fn->insts.size(); lifetime < l; ++lifetime) {
+      auto inst = routine->fn->insts[lifetime];
       routine->bundleIndexes.push_back(body.size());
       if(instanceof<bundler::AddInstruction>(inst)) {
         auto add = dynCast<bundler::AddInstruction>(inst);
@@ -618,7 +623,7 @@ namespace pickc::windows::x64
       else if(instanceof<bundler::JmpInstruction>(inst)) {
         auto jmp = dynCast<bundler::JmpInstruction>(inst);
         if(jmp->cond == nullptr) {
-          if(jmp->then != i + 1) {
+          if(jmp->then != lifetime + 1) {
             body.push_back(new JmpOperation(jmp->then));
           }
         }
@@ -638,7 +643,7 @@ namespace pickc::windows::x64
             body.push_back(new CmpOperation(getSize(jmp->cond->type), regs[jmp->cond], Operand(0)));
             body.push_back(new JneOperation(jmp->then));
           }
-          if(jmp->els != i + 1) {
+          if(jmp->els != lifetime + 1) {
             body.push_back(new JmpOperation(jmp->els));
           }
         }
@@ -708,7 +713,7 @@ namespace pickc::windows::x64
       if(!stackStatus[i]) {
         ++cur;
         if(cur >= numBytes) {
-          for(size_t j = 0; j < cur; ++j) {
+          for(size_t j = 0; j < numBytes; ++j) {
             stackStatus[i - j] = true;
           }
           return Memory(Register::RBP, -i - numBytes, numBytes, true);
@@ -744,36 +749,37 @@ namespace pickc::windows::x64
   }
   void RoutineCompiler::freeRegs()
   {
-    // auto reg = regs.begin();
-    // while(reg != regs.end()) {
-    //   reg->second;
-    //   if(reg->first->lifeEnd < curLifeTime) {
-    //     switch(reg->second->type) {
-    //       case OperandType::Register:
-    //         regInfo[reg->second->reg] = RegisterInfo::Used;
-    //         break;
-    //       case OperandType::Memory:
-    //         if(reg->second->memory.base && reg->second->memory.base.get() == Register::RBP && reg->second->memory.needAddressFix) {
-    //           // TODO: call destructor
-    //           for(int i = 0; i < reg->second->memory.numBytes; ++i) {
-    //             assert(stackStatus[-reg->second->memory.disp + i]);
-    //             stackStatus[-reg->second->memory.disp + i] = false;
-    //           }
-    //           size_t size = 0;
-    //           for(int i = stackStatus.size() - 1; i >= 0; --i) {
-    //             if(!stackStatus[i]) ++size;
-    //             else break;
-    //           }
-    //           stackStatus.resize(stackStatus.size() - size);
-    //         }
-    //         break;
-    //     }
-    //     regs.erase(reg++);
-    //   }
-    //   else {
-    //     ++reg;
-    //   }
-    // }
+    auto reg = regs.begin();
+    while(reg != regs.end()) {
+      if(reg->first->lifeEnd < lifetime) {
+        switch(reg->second.type) {
+          case OperandType::Register:
+            regInfo[reg->second.reg] = RegisterInfo::Used;
+            break;
+          case OperandType::Memory:
+            if(reg->second.memory.base && reg->second.memory.base.get() == Register::RBP && reg->second.memory.needAddressFix) {
+              // TODO: call destructor
+              for(int i = 0; i < reg->second.memory.numBytes; ++i) {
+                assert(stackStatus[-reg->second.memory.disp - i - 1]);
+                stackStatus[-reg->second.memory.disp - i - 1] = false;
+              }
+            }
+            break;
+        }
+        if(keyExists(routine->fn->phis, reg->first)) {
+          for(auto phi : routine->fn->phis[reg->first]->regs) {
+            regs.erase(phi);
+          }
+          reg = regs.begin();
+        }
+        else {
+          regs.erase(reg++);
+        }
+      }
+      else {
+        ++reg;
+      }
+    }
   }
   OperationSize RoutineCompiler::getSize(const pcir::TypeSection* type)
   {
