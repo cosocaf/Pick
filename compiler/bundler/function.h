@@ -10,6 +10,10 @@ namespace pickc::bundler
 {
   struct Register {
     pcir::TypeSection* type;
+    // このレジスタが使用されるフローとそのフロー内で最後に使用される命令のインデックス
+    std::unordered_map<pcir::FlowStruct*, size_t> used;
+    // このレジスタの生存期間
+    size_t lifeEnd;
   };
   struct Instruction
   {
@@ -108,7 +112,6 @@ namespace pickc::bundler
     // ジャンプする条件。無条件ジャンプならnullptr
     Register* cond;
   };
-  
 
   struct PhiGroup
   {

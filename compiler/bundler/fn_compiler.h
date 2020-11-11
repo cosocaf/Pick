@@ -16,8 +16,10 @@ namespace pickc::bundler
     Function* fn;
     std::unordered_map<pcir::RegisterStruct*, Register*> regs;
     std::unordered_map<pcir::FlowStruct*, std::vector<Instruction*>> flows;
+    std::unordered_map<pcir::FlowStruct*, std::unordered_set<pcir::FlowStruct*>> downstreamFlows;
     std::unordered_set<pcir::FlowStruct*> joinedFlows;
     Result<_, std::vector<std::string>> flowCompile(pcir::FlowStruct* flow);
+    std::unordered_set<pcir::FlowStruct*> downstream(pcir::FlowStruct* flow);
     void joinFlows(pcir::FlowStruct* flow);
     // ジャンプ命令の一覧。JmpInstruction::toIndexを求めるために使用する。
     std::unordered_map<JmpInstruction*, std::pair<pcir::FlowStruct*, pcir::FlowStruct*>> jmpTo;

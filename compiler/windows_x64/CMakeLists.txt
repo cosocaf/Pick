@@ -11,6 +11,7 @@ add_library(
   operation_impl/binary_operations.cpp
   operation_impl/mul_div_operations.cpp
   operation_impl/mov_operation.cpp
+  operation_impl/movx_operations.cpp
   operation_impl/neg_operation.cpp
   operation_impl/convert_operations.cpp
   operation_impl/lea_operation.cpp

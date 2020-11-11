@@ -29,10 +29,10 @@
 					"match": "\\b(pub|pri|extern|import)\\b"
 				},
 				{
-					"match": "\\b(fn)\\s+([^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*)?",
+					"match": "\\b(fn)(\\s+|\\()([^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*)?",
 					"captures": {
 						"1": {"name": "storage.type"},
-						"2": {"name": "entity.name.function"}
+						"3": {"name": "entity.name.function"}
 					}
 				},
 				{
@@ -82,10 +82,6 @@
 				{
 					"name": "constant.numeric.float.pick",
 					"match": "\\b\\d+(\\.\\d+)?(e(\\+|-)\\d+)?(f32|f64)?\\b"
-				},
-				{
-					"name": "constant.character.pick",
-					"match": "\\b'\\.'\\b"
 				}
 			]
 		},
@@ -95,7 +91,23 @@
 					"name": "string.quoted.double.pick",
 					"begin": "\"",
 					"end": "\"",
-					"match": "\"[^\\n]*\""
+					"match": "\"[^\\n]*\"",
+					"patterns": [
+						{
+							"name": "constant.character.escape.pick",
+							"match": "\\\\."
+						}
+					]
+				},
+				{
+					"name": "string.quoted.single.pick",
+					"match": "'\\\\?.'",
+					"patterns": [
+						{
+							"name": "constant.character.escape.pick",
+							"match": "\\\\."
+						}
+					]
 				},
 				{
 					"name": "string.interpolated.pick",
@@ -114,7 +126,7 @@
 			"patterns": [
 				{
 					"name": "variable.language",
-					"match": "\\b(true|false|this|self|void|i8|i16|i32|i64|u8|u16|u32|u64|bool|char)\\b"
+					"match": "\\b(true|false|this|self|void|i8|i16|i32|i64|u8|u16|u32|u64|bool|char|ptr|null)\\b"
 				},
 				{
 					"name": "variable.name",

@@ -18,6 +18,7 @@ namespace pickc::bundler
     fn->fnType = pcirFn->fnType;
     if(fn->fnType == pcir::FN_TYPE_FUNCTION) {
       flowCompile(pcirFn->entryFlow);
+      downstream(pcirFn->entryFlow);
       joinFlows(pcirFn->entryFlow);
       for(auto& jmp : jmpTo) {
         jmp.first->then = flowIndexes[jmp.second.first];
@@ -62,6 +63,7 @@ namespace pickc::bundler
       inst->left = left;
       inst->right = right;
       flows[flow].push_back(inst);
+      dist->used[flow] = left->used[flow] = right->used[flow] = flows[flow].size();
     };
     template<typename Instruction>
     void unaryInstruction(std::unordered_map<pickc::pcir::FlowStruct *, std::vector<pickc::bundler::Instruction *>>& flows, pcir::FlowStruct* flow, pcir::FunctionSection* pcirFn, std::unordered_map<pcir::RegisterStruct*, Register*>& regs, Function* fn, size_t& i, std::vector<std::string>& errors)
@@ -82,6 +84,7 @@ namespace pickc::bundler
       inst->dist = dist;
       inst->src = regs[pcirFn->regs[srcIndex]];
       flows[flow].push_back(inst);
+      dist->used[flow] = regs[pcirFn->regs[srcIndex]]->used[flow] = flows[flow].size();
     }
   }
   Result<_, std::vector<std::string>> FnCompiler::flowCompile(pcir::FlowStruct* flow)
@@ -134,6 +137,7 @@ namespace pickc::bundler
             default: assert(false); errors.push_back("PCIRエラー: 不正な型のレジスタに即値を代入しました。");
           }
           flows[flow].push_back(inst);
+          dist->used[flow] = flows[flow].size();
           break;
         }
         case Call: {
@@ -156,6 +160,8 @@ namespace pickc::bundler
             inst->args.push_back(regs[pcirFn->regs[arg]]);
           }
           flows[flow].push_back(inst);
+          inst->dist->used[flow] = inst->fn->used[flow] = flows[flow].size();
+          for(auto& arg : inst->args) arg->used[flow] = flows[flow].size();
           break;
         }
         case LoadFn: {
@@ -172,6 +178,7 @@ namespace pickc::bundler
           inst->dist = regs[pcirFn->regs[dist]];
           inst->fn = pcir->fnSection[src];
           flows[flow].push_back(inst);
+          inst->dist->used[flow] = flows[flow].size();
           break;
         }
         case LoadArg: {
@@ -188,6 +195,7 @@ namespace pickc::bundler
           inst->dist = regs[pcirFn->regs[dist]];
           inst->indexOfArg = arg;
           flows[flow].push_back(inst);
+          inst->dist->used[flow] = flows[flow].size();
           break;
         }
         case LoadSymbol: {
@@ -204,6 +212,7 @@ namespace pickc::bundler
           inst->dist = regs[pcirFn->regs[dist]];
           inst->symbol = bundle->symbolNames[pcir->textSection[sym]->text];
           flows[flow].push_back(inst);
+          inst->dist->used[flow] = flows[flow].size();
           break;
         }
         case LoadString: {
@@ -220,6 +229,7 @@ namespace pickc::bundler
           inst->dist = regs[pcirFn->regs[dist]];
           inst->text = pcir->textSection[str];
           flows[flow].push_back(inst);
+          inst->dist->used[flow] = flows[flow].size();
           break;
         }
         case LoadElem: {
@@ -240,6 +250,7 @@ namespace pickc::bundler
           inst->array = regs[pcirFn->regs[array]];
           inst->index = regs[pcirFn->regs[index]];
           flows[flow].push_back(inst);
+          inst->dist->used[flow] = flows[flow].size();
           break;
         }
         case Alloc: {
@@ -251,6 +262,7 @@ namespace pickc::bundler
           inst->dist = regs[pcirFn->regs[dist]];
           inst->src = regs[pcirFn->regs[src]];
           flows[flow].push_back(inst);
+          inst->dist->used[flow] = inst->src->used[flow] = flows[flow].size();
           break;
         }
         case Mov:
@@ -294,6 +306,7 @@ namespace pickc::bundler
             fn->phis[regs[pcirFn->regs[r1]]] = group;
             fn->phis[regs[pcirFn->regs[r2]]] = group;
           }
+          regs[pcirFn->regs[dist]]->used[flow] = regs[pcirFn->regs[r1]]->used[flow] = regs[pcirFn->regs[r2]]->used[flow] = flows[flow].size();
           break;
         }
         default: {
@@ -343,11 +356,49 @@ namespace pickc::bundler
     return error(errors);
   }
 
+  std::unordered_set<pcir::FlowStruct*> FnCompiler::downstream(pcir::FlowStruct* flow)
+  {
+    if(keyExists(downstreamFlows, flow)) return { flow };
+    if(flow->flowType & pcir::FLOW_TYPE_NORMAL) {
+      downstreamFlows[flow].merge(downstream(flow->next));
+    }
+    else if(flow->flowType & pcir::FLOW_TYPE_COND_BRANCH) {
+      downstreamFlows[flow].merge(downstream(flow->thenFlow));
+      downstreamFlows[flow].merge(downstream(flow->elseFlow));
+    }
+    else if(flow->flowType & pcir::FLOW_TYPE_END_POINT) {
+      // do nothing.
+    }
+    else {
+      assert(false);
+    }
+    return downstreamFlows[flow];
+  }
   void FnCompiler::joinFlows(pcir::FlowStruct* flow)
   {
     if(exists(joinedFlows, flow)) return;
+
     flowIndexes[flow] = fn->insts.size();
     fn->insts += flows[flow];
+
+    for(const auto& reg : regs) {
+      if(keyExists(reg.second->used, flow)) {
+        bool free = true;
+        for(const auto& used : reg.second->used) {
+          if(flow != used.first && exists(downstreamFlows[flow], used.first)) {
+            free = false;
+            break;
+          }
+        }
+        if(free) {
+          reg.second->lifeEnd = flowIndexes[flow] + reg.second->used[flow];
+          if(exists(downstreamFlows[flow], flow)) {
+            reg.second->lifeEnd = -1;
+          }
+        }
+      }
+    }
+
     joinedFlows.insert(flow);
     if(flow->flowType & pcir::FLOW_TYPE_NORMAL) {
       joinFlows(flow->next);

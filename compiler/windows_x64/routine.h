@@ -342,6 +342,38 @@ namespace pickc::windows::x64
     virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
   };
 
+  class MovXOperation : public Operation
+  {
+  protected:
+    OperationSize distSize;
+    OperationSize srcSize;
+    Register dist;
+    Operand src;
+    BinaryVec movxTemplate(Routine* routine, uint8_t opb, uint8_t opv);
+  public:
+    MovXOperation(OperationSize distSize, OperationSize srcSize, Register dist, Operand src);
+  };
+  class MovSXOperation : public MovXOperation
+  {
+  public:
+    using MovXOperation::MovXOperation;
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+  class MovSXDOperation : public Operation
+  {
+    Register dist;
+    Operand src;
+  public:
+    MovSXDOperation(Register dist, Operand src);
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+  class MovZXOperation : public MovXOperation
+  {
+  public:
+    using MovXOperation::MovXOperation;
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+
   class NegOperation : public Operation
   {
     Operand operand;
