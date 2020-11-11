@@ -31,7 +31,7 @@ namespace pickc::windows::x64
         operand.push_back(0b11'000'000 | modRM(src.reg, dist.reg));
       }
       else if(src.type == OperandType::Memory) {
-        if(src.reg >= Register::R8 && src.reg <= Register::R15) rex |= REXB;
+        if(src.memory.base.get() >= Register::R8 && src.memory.base.get() <= Register::R15) rex |= REXB;
         if(dist.reg >= Register::R8 && dist.reg <= Register::R15) rex |= REXR;
         if(size == OperationSize::Byte) opcode.push_back(gbeb);
         else opcode.push_back(gvev);
@@ -157,6 +157,7 @@ namespace pickc::windows::x64
   }
 
   BinaryOperation::BinaryOperation(OperationSize size, Operand dist, Operand src) : Operation(size), dist(dist), src(src) {
+    assert(dist.type != OperandType::Immediate);
   }
   BinaryVec AddOperation::bin(WindowsX64& x64, Routine* routine)
   {
@@ -165,6 +166,10 @@ namespace pickc::windows::x64
   BinaryVec SubOperation::bin(WindowsX64& x64, Routine* routine)
   {
     return binaryOpTemplate(routine, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0b00'101'000);
+  }
+  BinaryVec XorOperation::bin(WindowsX64& x64, Routine* routine)
+  {
+    return binaryOpTemplate(routine, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0b00'110'000);
   }
   BinaryVec CmpOperation::bin(WindowsX64& x64, Routine* routine)
   {

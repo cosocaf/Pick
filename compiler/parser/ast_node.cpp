@@ -24,6 +24,14 @@ namespace pickc::parser
       elseExpr->dump(indent2 + "   +--", indent2 + "      ");
     }
   }
+  void WhileNode::dump(const std::string& indent, const std::string& indent2) const
+  {
+    std::cout << indent << "While" << std::endl;
+    std::cout << indent2 << "+--Comp" << std::endl;
+    comp->dump(indent2 + "|  +--", indent2 + "|     ");
+    std::cout << indent2 << "+--Body" << std::endl;
+    body->dump(indent2 + "   +--", indent2 + "      ");
+  }
   IntegerLiteral::IntegerLiteral(int value) : value(value) {}
   void IntegerLiteral::dump(const std::string& indent, const std::string&) const
   {
@@ -88,6 +96,10 @@ namespace pickc::parser
   void BoolLiteral::dump(const std::string& indent, const std::string&) const
   {
     std::cout << indent << "Bool Literal (" << (value ? "true" : "false") << ")" << std::endl;
+  }
+  void NullLiteral::dump(const std::string& indent, const std::string& indent2) const
+  {
+    std::cout << indent << "Null Literal (null)" << std::endl;
   }
   CharLiteral::CharLiteral(char value) : value(value) {}
   void CharLiteral::dump(const std::string& indent, const std::string&) const
@@ -430,6 +442,7 @@ namespace pickc::parser
   {
     std::cout << indent << "Alias Define" << std::endl;
   }
+  ImportNode::ImportNode(VariableNode* name) : name(name) {}
   void ImportNode::dump(const std::string& indent, const std::string& indent2) const
   {
     std::cout << indent << "Import Module" << std::endl;
@@ -441,8 +454,8 @@ namespace pickc::parser
     std::cout << indent2 << "+--Name" << std::endl;
     name->dump(indent2 + "|  +--", indent2 + "|     ");
     std::cout << indent2 << "+--Args" << std::endl;
-    for(const auto& arg : args) {
-      arg->dump(indent2 + "|  +--", indent2 + "|     ");
+    for(size_t i = 0, l = args.size(); i < l; ++i) {
+      args[i]->dump(indent2 + "|  +--", indent2 + "|  " + (i + 1 < l ? "|  " : "   "));
     }
     std::cout << indent2 << "+--Return Type" << std::endl;
     retType->dump(indent2 + "   +--", indent2 + "      ");

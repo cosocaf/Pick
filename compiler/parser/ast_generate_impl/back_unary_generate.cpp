@@ -102,6 +102,7 @@ namespace pickc::parser
           assert(false);
       }
     }
+    result->tokens = std::vector(begin, currentTokenIter() + 1);
     return ok(result);
   }
 }

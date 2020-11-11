@@ -27,6 +27,7 @@ namespace pickc::parser
         delete result;
         return error(right.err());
       }
+      result->tokens = std::vector(begin, currentTokenIter() + 1);
       switch(op.get().kind) {
         case TokenKind::Equal:
           result = new EqualNode(result, right.get());

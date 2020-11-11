@@ -50,9 +50,9 @@ int main(char argc, char* argv[])
         }
         return STATUS_WINDOWS_X64_ERROR;
       }
-      auto errs = windows::x64::Linker(x64.get()).link(option.get());
-      if(errs) {
-        for(const auto& err : errs.get()) {
+      auto res = windows::x64::Linker(x64.get()).link(option.get());
+      if(!res) {
+        for(const auto& err : res.err()) {
           std::cout << CONSOLE_FG_RED << err << CONSOLE_DEFAULT << std::endl;
         }
         return STATUS_WINDOWS_X64_LINKER_ERROR;

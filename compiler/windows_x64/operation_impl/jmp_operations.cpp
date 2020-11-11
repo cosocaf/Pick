@@ -65,4 +65,14 @@ namespace pickc::windows::x64
     code << 0;
     return code;
   }
+  ExtJmpOperation::ExtJmpOperation(const std::string& ext) : Operation(OperationSize::QWord), ext(ext) {}
+  BinaryVec ExtJmpOperation::bin(WindowsX64& x64, Routine* routine)
+  {
+    BinaryVec code;
+    code.push_back(0xFF);
+    code.push_back(0x25);
+    x64.relocs.insert(new RelocationInfo(routine, Relocation(ext), this, code.size(), OperationSize::DWord, RelocationPosition::Relative));
+    code << 0;
+    return code;
+  }
 }

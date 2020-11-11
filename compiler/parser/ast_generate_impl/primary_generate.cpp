@@ -51,6 +51,15 @@ namespace pickc::parser
         assert(value == "true" || value == "false");
         node = new BoolLiteral(value == "true");
         break;
+      case TokenKind::Null:
+        node = new NullLiteral();
+        break;
+      case TokenKind::Char:
+        node = new CharLiteral(value[0]);
+        break;
+      case TokenKind::String:
+        node = new StringLiteral(value);
+        break;
       case TokenKind::LBracket: {
         // TODO: 配列リテラル
         assert(false);
@@ -109,14 +118,19 @@ namespace pickc::parser
               break;
             }
             case TokenKind::ReturnKeyword: {
+              auto now = currentTokenIter();
               next = nextToken();
               if(!next) return error(createEOTError("式が必要です。"));
               if(includes({ TokenKind::Semicolon, TokenKind::RBrase }, next.get().kind)) {
-                unodes.emplace_back(std::make_unique<ReturnNode>(nullptr));
+                auto ret = std::make_unique<ReturnNode>(nullptr);
+                ret->tokens = std::vector(now, currentTokenIter() + 1);
+                unodes.emplace_back(std::move(ret));
               }
               else {
                 auto expr = exprGenerate();
-                if(expr) unodes.emplace_back(std::make_unique<ReturnNode>(expr.get()));
+                auto ret = std::make_unique<ReturnNode>(expr.get());
+                ret->tokens = std::vector(now, currentTokenIter() + 1);
+                if(expr) unodes.emplace_back(std::move(ret));
                 else errors += expr.err();
               }
               break;
@@ -176,7 +190,26 @@ namespace pickc::parser
         }
         break;
       }
+      case TokenKind::WhileKeyword: {
+        std::vector<std::string> errors;
+        if(!nextToken()) return error(createEOTError("(が必要です。"));
+        if(currentToken().kind != TokenKind::LParen) errors.push_back("(が必要です。");
+        if(!nextToken()) return error(errors + createEOTError("式が必要です。"));
+        auto comp = exprGenerate();
+        if(!comp) errors += comp.err();
+        if(!nextToken()) return error(errors + createEOTError(")が必要です。"));
+        if(currentToken().kind != TokenKind::RParen) errors.push_back(")が必要です。");
+        if(!nextToken()) return error(errors + createEOTError("式が必要です。"));
+        auto body = exprGenerate();
+        if(!body) errors += body.err();
+        auto whileNode = new WhileNode();
+        whileNode->comp = comp.get();
+        whileNode->body = body.get();
+        node = whileNode;
+        break;
+      }
       default:
+        assert(false);
         return error(std::vector{ createASTError("予期しないトークンです。", currentToken()) });
     }
     node->tokens = std::vector(begin, currentTokenIter() + 1);

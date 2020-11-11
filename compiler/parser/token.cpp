@@ -81,6 +81,7 @@ namespace pickc::parser
       else if (buf == "char") kind = TokenKind::CharKeyword;
       else if (buf == "ptr") kind = TokenKind::PtrKeyword;
       else if (buf == "true" || buf == "false") kind = TokenKind::Bool;
+      else if (buf == "null") kind = TokenKind::Null;
       else if (buf == "this") kind = TokenKind::This;
       else {
         std::smatch match;
@@ -325,12 +326,88 @@ namespace pickc::parser
               sequence.tokens.push_back(Token(TokenKind::Scope, "::", line + 1, letter));
             }
             break;
-          case '\'':
+          case '\'': {
             // TODO: マルチバイト文字の対応
-            assert(false);
-          case '"':
+            clearBuf();
+            auto let = letter;
+            if(++letter >= len) {
+              errors.push_back("エラー: 'が必要です。\n    at " + sequence.file + " " + std::to_string(line + 1) + "行目, " + std::to_string(let + 1) + "文字目");
+              break;
+            }
+            char c = str[letter];
+            if(c == '\'') {
+              errors.push_back("エラー: 文字が必要です。\n    at " + sequence.file + " " + std::to_string(line + 1) + "行目, " + std::to_string(let + 1) + "文字目");
+              break;
+            }
+            if(c == '\\') {
+              if(++letter >= len) {
+                errors.push_back("エラー: 文字が必要です。\n    at " + sequence.file + " " + std::to_string(line + 1) + "行目, " + std::to_string(let + 1) + "文字目");
+                break;
+              }
+              switch(str[letter]) {
+                case 'a': c = '\a'; break;
+                case 'b': c = '\b'; break;
+                case 'n': c = '\n'; break;
+                case 'r': c = '\r'; break;
+                case 'f': c = '\f'; break;
+                case 't': c = '\t'; break;
+                case 'v': c = '\v'; break;
+                case '\\': c = '\\'; break;
+                case '0': c = '\0'; break;
+                case '"': c = '"'; break;
+                case '\'': c = '\''; break;
+                default: errors.push_back(std::string("エラー: ") + str[letter] + " は不正なエスケープです。\n    at " + sequence.file + " " + std::to_string(line + 1) + "行目, " + std::to_string(let + 1) + "文字目");
+              }
+            }
+            if(++letter >= len) {
+              errors.push_back("エラー: 'が必要です。\n    at " + sequence.file + " " + std::to_string(line + 1) + "行目, " + std::to_string(let + 1) + "文字目");
+              break;
+            }
+            sequence.tokens.push_back(Token(TokenKind::Char, std::string() + c, line + 1, let + 1));
+            break;
+          }
+          case '"': {
             // TODO: マルチバイト文字の対応
-            assert(false);
+            clearBuf();
+            std::string string;
+            bool correct = false;
+            bool esc = false;
+            auto let = letter;
+            for(++letter; letter < len; ++letter) {
+              if(str[letter] == '\\') {
+                esc = true;
+              }
+              else if(esc) {
+                esc = false;
+                switch(str[letter]) {
+                  case 'a': string += '\a'; break;
+                  case 'b': string += '\b'; break;
+                  case 'n': string += '\n'; break;
+                  case 'r': string += '\r'; break;
+                  case 'f': string += '\f'; break;
+                  case 't': string += '\t'; break;
+                  case 'v': string += '\v'; break;
+                  case '\\': string += '\\'; break;
+                  case '0': string += '\0'; break;
+                  case '"': string += '"'; break;
+                  case '\'': string += '\''; break;
+                  default: errors.push_back(std::string("エラー: ") + str[letter] + " は不正なエスケープです。\n    at " + sequence.file + " " + std::to_string(line + 1) + "行目, " + std::to_string(let + 1) + "文字目");
+                }
+              }
+              else if(str[letter] == '"') {
+                sequence.tokens.push_back(Token(TokenKind::String, string, line + 1, let + 1));
+                correct = true;
+                break;
+              }
+              else {
+                string += str[letter];
+              }
+            }
+            if(esc || !correct) {
+              errors.push_back("エラー: \"が必要です。\n    at " + sequence.file + " " + std::to_string(line + 1) + "行目, " + std::to_string(let + 1) + "文字目");
+            }
+            break;
+          }
           default:
             buf += str[letter];
         }
@@ -342,256 +419,4 @@ namespace pickc::parser
     if(errors.empty()) return ok(std::move(sequence));
     return error(errors);
   }
-  // Result<Option<Token>, std::string> Tokenizer::findToken(std::string& str, size_t& line, size_t& letter)
-  // {
-  //   assert(letter < str.size());
-  //   const auto tokenLine = line + 1;
-  //   const auto tokenLetter = letter + 1;
-  //   std::string buf;
-  //   const auto createToken = [&](TokenKind kind, Option<const std::string> value = none) {
-  //     return some(Token{kind, value ? value.get() : buf, tokenLine, tokenLetter});
-  //   };
-  //   const auto clearBuf = [&]() -> Option<Result<Option<Token>, std::string>> {
-  //     if(buf.size() == 0) return none;
-  //     if (buf == "fn") return some(ok(createToken(TokenKind::FnKeyword)));
-  //     else if (buf == "def") return some(ok(createToken(TokenKind::DefKeyword)));
-  //     else if (buf == "mut") return some(ok(createToken(TokenKind::MutKeyword)));
-  //     else if (buf == "extern") return some(ok(createToken(TokenKind::ExternKeyword)));
-  //     else if (buf == "import") return some(ok(createToken(TokenKind::ImportKeyword)));
-  //     else if (buf == "return") return some(ok(createToken(TokenKind::ReturnKeyword)));
-  //     else if (buf == "if") return some(ok(createToken(TokenKind::IfKeyword)));
-  //     else if (buf == "else") return some(ok(createToken(TokenKind::ElseKeyword)));
-  //     else if (buf == "for") return some(ok(createToken(TokenKind::ForKeyword)));
-  //     else if (buf == "while") return some(ok(createToken(TokenKind::WhileKeyword)));
-  //     else if (buf == "loop") return some(ok(createToken(TokenKind::LoopKeyword)));
-  //     else if (buf == "pub") return some(ok(createToken(TokenKind::PubKeyword)));
-  //     else if (buf == "pri") return some(ok(createToken(TokenKind::PriKeyword)));
-  //     else if (buf == "class") return some(ok(createToken(TokenKind::ClassKeyword)));
-  //     else if (buf == "construct") return some(ok(createToken(TokenKind::ConstructKeyword)));
-  //     else if (buf == "destruct") return some(ok(createToken(TokenKind::DestructKeyword)));
-  //     else if (buf == "type") return some(ok(createToken(TokenKind::TypeKeyword)));
-  //     else if (buf == "i8") return some(ok(createToken(TokenKind::I8Keyword)));
-  //     else if (buf == "i16") return some(ok(createToken(TokenKind::I16Keyword)));
-  //     else if (buf == "i32") return some(ok(createToken(TokenKind::I32Keyword)));
-  //     else if (buf == "i64") return some(ok(createToken(TokenKind::I64Keyword)));
-  //     else if (buf == "u8") return some(ok(createToken(TokenKind::U8Keyword)));
-  //     else if (buf == "u16") return some(ok(createToken(TokenKind::U16Keyword)));
-  //     else if (buf == "u32") return some(ok(createToken(TokenKind::U32Keyword)));
-  //     else if (buf == "u64") return some(ok(createToken(TokenKind::U64Keyword)));
-  //     else if (buf == "f32") return some(ok(createToken(TokenKind::F32Keyword)));
-  //     else if (buf == "f64") return some(ok(createToken(TokenKind::F64Keyword)));
-  //     else if (buf == "void") return some(ok(createToken(TokenKind::VoidKeyword)));
-  //     else if (buf == "bool") return some(ok(createToken(TokenKind::BoolKeyword)));
-  //     else if (buf == "char") return some(ok(createToken(TokenKind::CharKeyword)));
-  //     else if (buf == "true" || buf == "false") return some(ok(createToken(TokenKind::Bool)));
-  //     else if (buf == "this") return some(ok(createToken(TokenKind::This)));
-  //     else {
-  //         std::smatch match;
-  //         if (std::regex_match(buf, match, std::regex(R"(^\d+$)"))) return some(ok(createToken(TokenKind::Integer)));
-  //         else if (std::regex_match(buf, match, std::regex(R"(^\d+i8$)"))) return some(ok(createToken(TokenKind::I8)));
-  //         else if (std::regex_match(buf, match, std::regex(R"(^\d+i16$)"))) return some(ok(createToken(TokenKind::I16)));
-  //         else if (std::regex_match(buf, match, std::regex(R"(^\d+i32$)"))) return some(ok(createToken(TokenKind::I32)));
-  //         else if (std::regex_match(buf, match, std::regex(R"(^\d+i64$)"))) return some(ok(createToken(TokenKind::I64)));
-  //         else if (std::regex_match(buf, match, std::regex(R"(^\d+u8$)"))) return some(ok(createToken(TokenKind::U8)));
-  //         else if (std::regex_match(buf, match, std::regex(R"(^\d+u16$)"))) return some(ok(createToken(TokenKind::U16)));
-  //         else if (std::regex_match(buf, match, std::regex(R"(^\d+u32$)"))) return some(ok(createToken(TokenKind::I32)));
-  //         else if (std::regex_match(buf, match, std::regex(R"(^\d+u64$)"))) return some(ok(createToken(TokenKind::U64)));
-  //         else if (std::regex_match(buf, match, std::regex(R"(^\d+?\.?\d+(e[\-+]?\d+)?$)"))) return some(ok(createToken(TokenKind::Float)));
-  //         else if (std::regex_match(buf, match, std::regex(R"(^\d+?\.?\d+(e[\-+]?\d+)?f32$)"))) return some(ok(createToken(TokenKind::F32)));
-  //         else if (std::regex_match(buf, match, std::regex(R"(^\d+?\.?\d+(e[\-+]?\d+)?f64$)"))) return some(ok(createToken(TokenKind::F64)));
-  //         else if (std::regex_match(buf, match, std::regex(R"(^[^\s!-?\[-\^`\{-~][^\s!-/:-?\[-\^`\{-~]*$)"))) return some(ok(createToken(TokenKind::Identify)));
-  //         else return some(error("エラー: " + buf + " は不正な文字です。\n    at " + sequence.file + " " + std::to_string(tokenLine) + "行目, " + std::to_string(tokenLetter) + "文字目"));
-  //       }
-  //   };
-  //   for(size_t len = str.size(); letter < len; ++letter) {
-  //     switch(str[letter]) {
-  //       // 空白文字はスキップ
-  //       case ' ':
-  //       case '\t':
-  //         clearBuf();
-  //         return ok(none);
-  //       case '(':
-  //         clearBuf();
-  //         return ok(createToken(TokenKind::LParen, some("(")));
-  //       case ')':
-  //         clearBuf();
-  //         return ok(createToken(TokenKind::RParen, some(")")));
-  //       case '{':
-  //         clearBuf();
-  //         return ok(createToken(TokenKind::LBrace, some("{")));
-  //       case '}':
-  //         clearBuf();
-  //         return ok(createToken(TokenKind::RBrase, some("}")));
-  //       case '[':
-  //         clearBuf();
-  //         return ok(createToken(TokenKind::LBracket, some("[")));
-  //       case ']':
-  //         clearBuf();
-  //         return ok(createToken(TokenKind::RBracket, some("]")));
-  //       case ';':
-  //         clearBuf();
-  //         return ok(createToken(TokenKind::Semicolon, some(";")));
-  //       case '+':
-  //         clearBuf();
-  //         if(++letter >= len || (str[letter] != '+' && str[letter] != '=')) {
-  //           --letter;
-  //           return ok(createToken(TokenKind::Plus, some("+")));
-  //         }
-  //         else if(str[letter] == '+') {
-  //           return ok(createToken(TokenKind::Inc, some("++")));
-  //         }
-  //         else {
-  //           return ok(createToken(TokenKind::AddAsign, some("+=")));
-  //         }
-  //       case '-':
-  //         clearBuf();
-  //         if(++letter >= len || (str[letter] != '-' && str[letter] != '=')) {
-  //           --letter;
-  //           return ok(createToken(TokenKind::Minus, some("-")));
-  //         }
-  //         else if(str[letter] == '-') {
-  //           return ok(createToken(TokenKind::Dec, some("--")));
-  //         }
-  //         else {
-  //           return ok(createToken(TokenKind::SubAsign, some("-=")));
-  //         }
-  //       case '*':
-  //         clearBuf();
-  //         if(++letter >= len || str[letter] != '=') {
-  //           --letter;
-  //           return ok(createToken(TokenKind::Asterisk, some("*")));
-  //         }
-  //         else {
-  //           return ok(createToken(TokenKind::MulAsign, some("*=")));
-  //         }
-  //       case '/':
-  //         clearBuf();
-  //         if(++letter >= len || (str[letter] != '=' && str[letter] != '/')) {
-  //           --letter;
-  //           return ok(createToken(TokenKind::Slash, some("/")));
-  //         }
-  //         else if (str[letter] == '=') {
-  //           return ok(createToken(TokenKind::DevAsign, some("/=")));
-  //         }
-  //         else {
-  //           letter = len;
-  //           return ok(createToken(TokenKind::LineComment, some(str.substr(tokenLetter - 1))));
-  //         }
-  //       case '%':
-  //         clearBuf();
-  //         if(++letter >= len || str[letter] != '=') {
-  //           --letter;
-  //           return ok(createToken(TokenKind::Percent, some("%")));
-  //         }
-  //         else {
-  //           return ok(createToken(TokenKind::ModAsign, some("%=")));
-  //         }
-  //       case '&':
-  //         clearBuf();
-  //         if(++letter >= len || (str[letter] != '&' && str[letter] != '=')) {
-  //           --letter;
-  //           return ok(createToken(TokenKind::BitAnd, some("&")));
-  //         }
-  //         else if(str[letter] == '&') {
-  //           return ok(createToken(TokenKind::LogicalAnd, some("&&")));
-  //         }
-  //         else {
-  //           return ok(createToken(TokenKind::BitAndAsign, some("&=")));
-  //         }
-  //       case '|':
-  //         clearBuf();
-  //         if(++letter >= len || (str[letter] != '|' && str[letter] != '=')) {
-  //           --letter;
-  //           return ok(createToken(TokenKind::BitOr, some("|")));
-  //         }
-  //         else if(str[letter] == '|') {
-  //           return ok(createToken(TokenKind::LogicalOr, some("||")));
-  //         }
-  //         else {
-  //           return ok(createToken(TokenKind::BitOrAsign, some("|=")));
-  //         }
-  //       case '^':
-  //         clearBuf();
-  //         if(++letter >= len || str[letter] != '=') {
-  //           --letter;
-  //           return ok(createToken(TokenKind::BitXor, some("^")));
-  //         }
-  //         else {
-  //           return ok(createToken(TokenKind::BitXorAsign, some("^=")));
-  //         }
-  //       case '~':
-  //         clearBuf();
-  //         return ok(createToken(TokenKind::BitNot, some("~")));
-  //       case '=':
-  //         clearBuf();
-  //         if(++letter >= len || str[letter] != '=') {
-  //           --letter;
-  //           return ok(createToken(TokenKind::Asign, some("=")));
-  //         }
-  //         else {
-  //           return ok(createToken(TokenKind::Equal, some("==")));
-  //         }
-  //       case '<':
-  //         clearBuf();
-  //         if(++letter >= len || (str[letter] != '=' && str[letter] != '<')) {
-  //           --letter;
-  //           return ok(createToken(TokenKind::LessThan, some("<")));
-  //         }
-  //         else if(str[letter] == '=') {
-  //           return ok(createToken(TokenKind::LessEqual, some("<=")));
-  //         }
-  //         else if(++letter >= len || str[letter] != '=') {
-  //           return ok(createToken(TokenKind::LShift, some("<<")));
-  //         }
-  //         else {
-  //           return ok(createToken(TokenKind::LShiftAsign, some("<<=")));
-  //         }
-  //       case '>':
-  //         clearBuf();
-  //         if(++letter >= len || (str[letter] != '=' && str[letter] != '>')) {
-  //           --letter;
-  //           return ok(createToken(TokenKind::GreaterThan, some(">")));
-  //         }
-  //         else if(str[letter] == '=') {
-  //           return ok(createToken(TokenKind::GreaterEqual, some(">=")));
-  //         }
-  //         else if(++letter >= len || str[letter] != '=') {
-  //           return ok(createToken(TokenKind::RShift, some(">>")));
-  //         }
-  //         else {
-  //           return ok(createToken(TokenKind::RShiftAsign, some(">>=")));
-  //         }
-  //       case '!':
-  //         clearBuf();
-  //         if(++letter >= len || str[letter] != '=') {
-  //           --letter;
-  //           return ok(createToken(TokenKind::LogicalNot, some("!")));
-  //         }
-  //         else {
-  //           return ok(createToken(TokenKind::NotEqual, some("!=")));
-  //         }
-  //       case '.':
-  //         clearBuf();
-  //         if(++letter >= len || str[letter] != '.') {
-  //           --letter;
-  //           return ok(createToken(TokenKind::Dot, some(".")));
-  //         }
-  //         else {
-  //           return ok(createToken(TokenKind::Range, some("..")));
-  //         }
-  //       case ':':
-  //         clearBuf();
-  //         if(++letter >= len || str[letter] != ':') {
-  //           --letter;
-  //           return ok(createToken(TokenKind::Colon, some(":")));
-  //         }
-  //         else {
-  //           return ok(createToken(TokenKind::Scope, some("::")));
-  //         }
-  //       default:
-  //         buf += str[letter];
-  //     }
-  //   }
-  //   return clearBuf().get();
-  // }
 }

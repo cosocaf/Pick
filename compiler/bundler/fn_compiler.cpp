@@ -15,19 +15,24 @@ namespace pickc::bundler
     std::vector<std::string> errors;
     fn = new Function();
     fn->type = pcirFn->type;
-
-    flowCompile(pcirFn->entryFlow);
-    joinFlows(pcirFn->entryFlow);
-    for(auto& jmp : jmpTo) {
-      jmp.first->then = flowIndexes[jmp.second.first];
-      if(jmp.second.second) {
-        jmp.first->els = flowIndexes[jmp.second.second];
+    fn->fnType = pcirFn->fnType;
+    if(fn->fnType == pcir::FN_TYPE_FUNCTION) {
+      flowCompile(pcirFn->entryFlow);
+      joinFlows(pcirFn->entryFlow);
+      for(auto& jmp : jmpTo) {
+        jmp.first->then = flowIndexes[jmp.second.first];
+        if(jmp.second.second) {
+          jmp.first->els = flowIndexes[jmp.second.second];
+        }
+      }
+      for(auto& reg : regs) {
+        fn->regs.insert(reg.second);
       }
     }
-    for(auto& reg : regs) {
-      fn->regs.insert(reg.second);
+    else {
+      fn->externName = pcirFn->externName;
     }
-
+    
     if(errors.empty()) return ok(fn);
     return error(errors);
   }
@@ -58,6 +63,26 @@ namespace pickc::bundler
       inst->right = right;
       flows[flow].push_back(inst);
     };
+    template<typename Instruction>
+    void unaryInstruction(std::unordered_map<pickc::pcir::FlowStruct *, std::vector<pickc::bundler::Instruction *>>& flows, pcir::FlowStruct* flow, pcir::FunctionSection* pcirFn, std::unordered_map<pcir::RegisterStruct*, Register*>& regs, Function* fn, size_t& i, std::vector<std::string>& errors)
+    {
+      auto distIndex = get32(flow->code, i);
+      auto srcIndex = get32(flow->code, i);
+      assert(keyExists(regs, pcirFn->regs[srcIndex]));
+      Register* dist;
+      if(!keyExists(regs, pcirFn->regs[distIndex])) {
+        dist = new Register();
+        dist->type = pcirFn->regs[distIndex]->type;
+        regs[pcirFn->regs[distIndex]] = dist;
+      }
+      else {
+        dist = regs[pcirFn->regs[distIndex]];
+      }
+      auto inst = new Instruction();
+      inst->dist = dist;
+      inst->src = regs[pcirFn->regs[srcIndex]];
+      flows[flow].push_back(inst);
+    }
   }
   Result<_, std::vector<std::string>> FnCompiler::flowCompile(pcir::FlowStruct* flow)
   {
@@ -72,22 +97,10 @@ namespace pickc::bundler
         case Mul: binaryInstructions<MulInstruction>(flows, flow, pcirFn, regs, fn, i, errors); break;
         case Div: binaryInstructions<DivInstruction>(flows, flow, pcirFn, regs, fn, i, errors); break;
         case Mod: binaryInstructions<ModInstruction>(flows, flow, pcirFn, regs, fn, i, errors); break;
-        case Inc:
-          // TODO
-          assert(false);
-          break;
-        case Dec:
-          // TODO
-          assert(false);
-          break;
-        case Pos:
-          // TODO
-          assert(false);
-          break;
-        case Neg:
-          // TODO
-          assert(false);
-          break;
+        case Inc: unaryInstruction<IncInstruction>(flows, flow, pcirFn, regs, fn, i, errors); break;
+        case Dec: unaryInstruction<DecInstruction>(flows, flow, pcirFn, regs, fn, i, errors); break;
+        case Pos: unaryInstruction<PosInstruction>(flows, flow, pcirFn, regs, fn, i, errors); break;
+        case Neg: unaryInstruction<NegInstruction>(flows, flow, pcirFn, regs, fn, i, errors); break;
         case EQ: binaryInstructions<EqInstruction>(flows, flow, pcirFn, regs, fn, i, errors); break;
         case NEQ: binaryInstructions<NeqInstruction>(flows, flow, pcirFn, regs, fn, i, errors); break;
         case GT: binaryInstructions<GtInstruction>(flows, flow, pcirFn, regs, fn, i, errors); break;
@@ -116,6 +129,8 @@ namespace pickc::bundler
             case Types::U16: inst->imm = get16(flow->code, i); break;
             case Types::U32: inst->imm = get32(flow->code, i); break;
             case Types::U64: inst->imm = get64(flow->code, i); break;
+            case Types::Null: inst->imm = 0; break;
+            case Types::Char: inst->imm = get8(flow->code, i); break;
             default: assert(false); errors.push_back("PCIRエラー: 不正な型のレジスタに即値を代入しました。");
           }
           flows[flow].push_back(inst);
@@ -188,6 +203,53 @@ namespace pickc::bundler
           auto inst = new LoadSymbolInstruction();
           inst->dist = regs[pcirFn->regs[dist]];
           inst->symbol = bundle->symbolNames[pcir->textSection[sym]->text];
+          flows[flow].push_back(inst);
+          break;
+        }
+        case LoadString: {
+          auto dist = get32(flow->code, i);
+          auto str = get32(flow->code, i);
+          if(keyExists(regs, pcirFn->regs[dist])) {
+            std::stringstream ss;
+            ss << "PCIRエラー: レジスタ#" << dist << "は既に使用されています。";
+            errors.push_back(ss.str());
+          }
+          regs[pcirFn->regs[dist]] = new Register();
+          regs[pcirFn->regs[dist]]->type = pcirFn->regs[dist]->type;
+          auto inst = new LoadStringInstruction();
+          inst->dist = regs[pcirFn->regs[dist]];
+          inst->text = pcir->textSection[str];
+          flows[flow].push_back(inst);
+          break;
+        }
+        case LoadElem: {
+          auto dist = get32(flow->code, i);
+          auto array = get32(flow->code, i);
+          auto index = get32(flow->code, i);
+          if(keyExists(regs, pcirFn->regs[dist])) {
+            std::stringstream ss;
+            ss << "PCIRエラー: レジスタ#" << dist << "は既に使用されています。";
+            errors.push_back(ss.str());
+          }
+          assert(keyExists(regs, pcirFn->regs[array]));
+          assert(keyExists(regs, pcirFn->regs[index]));
+          regs[pcirFn->regs[dist]] = new Register();
+          regs[pcirFn->regs[dist]]->type = pcirFn->regs[dist]->type;
+          auto inst = new LoadElemInstruction();
+          inst->dist = regs[pcirFn->regs[dist]];
+          inst->array = regs[pcirFn->regs[array]];
+          inst->index = regs[pcirFn->regs[index]];
+          flows[flow].push_back(inst);
+          break;
+        }
+        case Alloc: {
+          auto dist = get32(flow->code, i);
+          auto src = get32(flow->code, i);
+          assert(keyExists(regs, pcirFn->regs[dist]));
+          assert(keyExists(regs, pcirFn->regs[src]));
+          auto inst = new AllocInstruction();
+          inst->dist = regs[pcirFn->regs[dist]];
+          inst->src = regs[pcirFn->regs[src]];
           flows[flow].push_back(inst);
           break;
         }

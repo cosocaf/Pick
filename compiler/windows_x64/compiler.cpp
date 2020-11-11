@@ -3,6 +3,7 @@
 #include <filesystem>
 
 #include "utils/vector_utils.h"
+#include "pcir/pcir_format.h"
 
 #include "routine_compiler.h"
 
@@ -14,11 +15,19 @@ namespace pickc::windows::x64
     std::vector<std::string> errors;
     
     for(auto& fn : bundle.fns) {
-      if(auto res = RoutineCompiler(fn.second).compile()) {
-        x64.routines[fn.first] = res.get();
+      if(fn.second->fnType == pcir::FN_TYPE_FUNCTION) {
+        if(auto res = RoutineCompiler(fn.second, &x64).compile()) {
+          x64.routines[fn.first] = res.get();
+        }
+        else {
+          errors += res.err();
+        }
       }
       else {
-        errors += res.err();
+        x64.externs[fn.first] = fn.second->externName->text;
+        auto routine = new Routine();
+        routine->code.push_back(new ExtJmpOperation(x64.externs[fn.first]));
+        x64.routines[fn.first] = routine;
       }
     }
 

@@ -2,6 +2,7 @@
 
 #include "pickc/config.h"
 #include "utils/vector_utils.h"
+#include "utils/map_utils.h"
 #include "utils/instanceof.h"
 #include "utils/dyn_cast.h"
 
@@ -9,7 +10,7 @@
 
 namespace pickc::pcir
 {
-  ModuleAnalyzer::ModuleAnalyzer(SemanticAnalyzer* sa, ModuleTree* tree) : sa(sa), tree(tree) {}
+  ModuleAnalyzer::ModuleAnalyzer(SemanticAnalyzer* sa, ModuleTree* tree, const std::unordered_set<ModuleTree*>& trees) : sa(sa), tree(tree), trees(trees) {}
   std::string ModuleAnalyzer::createSemanticError(const parser::Node* node, const std::string& message)
   {
     // assert(false);
@@ -114,12 +115,57 @@ namespace pickc::pcir
         assert(false);
       }
       else if(instanceof<ImportNode>(node)) {
-        // TODO
-        assert(false);
+        auto imp = dynCast<ImportNode>(node);
+        std::vector<std::string> module;
+        auto curMod = imp->name;
+        module.insert(module.begin(), curMod->name);
+        while(instanceof<ScopedVariableNode>(curMod)) {
+          curMod = dynCast<ScopedVariableNode>(curMod)->child;
+          module.insert(module.begin(), curMod->name);
+        }
+        bool found = false;
+        for(const auto& t : trees) {
+          if(t->name == module[0]) {
+            auto curTree = t;
+            for(size_t i = 1, l = module.size(); i < l; ++i) {
+              if(keyExists(curTree->submodules, module[i])) {
+                curTree = curTree->submodules[module[i]];
+              }
+              else {
+                curTree = nullptr;
+                break;
+              }
+            }
+            if(curTree != nullptr) {
+              tree->module.importModules.insert(curTree);
+              found = true;
+            }
+          }
+          if(found) break;
+        }
+        if(!found) {
+          std::string moduleName = module[0];
+          for(size_t i = 1, l = module.size(); i < l; ++i) moduleName += "::" + module[i];
+          errors.push_back(createSemanticError(imp, "モジュール " + moduleName + " が見つかりません。"));
+        }
       }
       else if(instanceof<ExternNode>(node)) {
-        // TODO
-        assert(false);
+        auto ext = dynCast<ExternNode>(node);
+        if(tree->module.symbols.find(ext->name->name) == tree->module.symbols.end()) {
+          auto symbol = new Symbol();
+          symbol->name = ext->name->name;
+          symbol->fullyQualifiedName = tree->name + "::" + symbol->name;
+          TypeFunction tf{};
+          tf.retType = new Type(ext->retType);
+          for(const auto& arg : ext->args) tf.args.push_back(new Type(arg->type));
+          symbol->type = tf;
+          symbol->scope = ext->isPub ? Scope::Public : Scope::Private;
+          symbol->mut = Mutability::Immutable;
+          symbol->expr = ext;
+          tree->module.symbols[ext->name->name] = symbol;
+          sa->texts.insert(symbol->fullyQualifiedName);
+        }
+        else errors.push_back(createSemanticError(ext->name, "既にシンボル " + ext->name->name + " は存在します。"));
       }
       else {
         assert(false);
@@ -162,16 +208,36 @@ namespace pickc::pcir
     if(errors.empty()) return none;
     return some(errors);
   }
-  Symbol* ModuleAnalyzer::findGlobalVar(const parser::VariableNode* var)
+  Result<Symbol*, std::vector<std::string>> ModuleAnalyzer::findGlobalVar(const parser::VariableNode* var)
   {
     using namespace parser;
     if(instanceof<ScopedVariableNode>(var)) {
-      // TODO
-      assert(false);
+      std::vector<std::string> module;
+      auto cur = var;
+      while(instanceof<ScopedVariableNode>(cur)) {
+        cur = dynCast<ScopedVariableNode>(cur)->child;
+        module.insert(module.begin(), cur->name);
+      }
+      std::string name = module[0];
+      for(size_t i = 1, l = module.size(); i < l; ++i) name += "::" + module[i];
+      for(const auto& mod : tree->module.importModules) {
+        if(mod->name == name) {
+          if(keyExists(mod->module.symbols, var->name)) {
+            if(mod->module.symbols[var->name]->scope == Scope::Public) {
+              return ok(mod->module.symbols[var->name]);
+            }
+            else {
+              return error(std::vector{ createSemanticError(var, "変数 " + name + "::" + var->name + " にアクセスできません。変数はプライベートです。") });
+            }
+          }
+        }
+      }
     }
     else {
-      if(tree->module.symbols.find(var->name) == tree->module.symbols.end()) return nullptr;
-      return tree->module.symbols[var->name];
+      if(keyExists(tree->module.symbols, var->name)) {
+        return ok(tree->module.symbols[var->name]);
+      }
     }
+    return error(std::vector{ createSemanticError(var, "変数 " + var->name + " が見つかりません。") });
   }
 }

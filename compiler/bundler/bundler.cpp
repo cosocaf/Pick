@@ -3,6 +3,7 @@
 #include <filesystem>
 
 #include "utils/vector_utils.h"
+#include "pcir/pcir_format.h"
 
 #include "fn_compiler.h"
 

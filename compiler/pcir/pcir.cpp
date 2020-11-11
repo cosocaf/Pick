@@ -2,6 +2,7 @@
 
 #include "pickc/config.h"
 #include "utils/instanceof.h"
+#include "utils/dyn_cast.h"
 #include "pcir_format.h"
 
 namespace pickc::pcir
@@ -9,10 +10,16 @@ namespace pickc::pcir
   Variable* FlowNode::findVar(const std::string& name) const
   {
     for(const auto& var : vars) if(var->name == name) return var;
-    // if(vars.find(name) != vars.end()) return vars.at(name);
     if(parentFlow) return parentFlow->findVar(name);
     if(belong->belong) return belong->belong->findVar(name);
     return nullptr;
+  }
+  std::unordered_map<Variable*, Register*> FlowNode::currentVars() const
+  {
+    std::unordered_map<Variable*, Register*> current;
+    for(const auto& var : vars) current[var] = var->reg;
+    if(parentFlow) current.merge(parentFlow->currentVars());
+    return current;
   }
   Option<std::string> FlowNode::retNotice(const Type& t) const
   {
@@ -22,7 +29,7 @@ namespace pickc::pcir
   {
     belong->addReg(reg);
   }
-  Function::Function() : entryFlow(new FlowNode{ FlowType::EndPoint }), result(nullptr), flows({ entryFlow }), belong(nullptr)
+  Function::Function() : fType(FunctionType::Function), entryFlow(new FlowNode{ FlowType::EndPoint }), result(nullptr), flows({ entryFlow }), belong(nullptr)
   {
     entryFlow->belong = this;
   }
@@ -71,23 +78,24 @@ namespace pickc::pcir
     else if (instanceof<F64TypeNode>(typeNode)) type = Types::F64;
     else if (instanceof<VoidTypeNode>(typeNode)) type = Types::Void;
     else if (instanceof<BoolTypeNode>(typeNode)) type = Types::Bool;
+    else if (instanceof<NullLiteral>(typeNode)) type = Types::Null;
     else if (instanceof<CharTypeNode>(typeNode)) type = Types::Char;
     else if (instanceof<ArrayTypeNode>(typeNode)) {
       type = Types::Array;
-      auto arrayNode = dynamic_cast<ArrayTypeNode*>(typeNode);
+      auto arrayNode = dynCast<ArrayTypeNode>(typeNode);
       new (&array) TypeArray();
       array.elem = new Type(arrayNode->elemType);
       array.length = static_cast<uint32_t>(arrayNode->length);
     }
     else if (instanceof<PtrTypeNode>(typeNode)) {
       type = Types::Ptr;
-      auto ptrNode = dynamic_cast<PtrTypeNode*>(typeNode);
+      auto ptrNode = dynCast<PtrTypeNode>(typeNode);
       new (&ptr) TypePtr();
       ptr.elem = new Type(ptrNode->base);
     }
     else if (instanceof<FnTypeNode>(typeNode)) {
       type = Types::Function;
-      auto fnNode = dynamic_cast<FnTypeNode*>(typeNode);
+      auto fnNode = dynCast<FnTypeNode>(typeNode);
       new (&fn) TypeFunction();
       fn.retType = new Type(fnNode->ret);
       fn.args.reserve(fnNode->args.size());
@@ -180,7 +188,22 @@ namespace pickc::pcir
   {
     // TODO
     assert(to.type != Types::_UNDEFINED && from.type != Types::_UNDEFINED);
-    return to.type == from.type || to.type == Types::Any;
+    if(to.type == from.type) {
+      if(to.type == Types::Function) {
+        if(to.fn.args.size() != from.fn.args.size()) return false;
+        if(!castable(*to.fn.retType, *from.fn.retType)) return false;
+        for(size_t i = 0, l = to.fn.args.size(); i < l; ++i) {
+          if(!castable(*to.fn.args[i], *from.fn.args[i])) return false;
+        }
+        return true;
+      }
+    }
+    return
+      (to.isInt() && from.isInt()) ||
+      to.type == from.type ||
+      to.type == Types::Any ||
+      (from.type == Types::Integer && to.isInt()) ||
+      (from.type == Types::Null && to.type == Types::Ptr);
   }
   bool Type::computable(uint8_t inst, const Type* left, const Type* right)
   {
@@ -193,6 +216,7 @@ namespace pickc::pcir
       case Div:
       case Mod:
         assert(right != nullptr);
+        if(left->isInt() && right->isInt()) return true;
         return left->type == right->type && (left->isInt() || left->isFloat())
         && (right->isInt() || right->isFloat());
       case EQ:
@@ -256,8 +280,17 @@ namespace pickc::pcir
           return Type(Types::Bool);
         }
         assert(false);
+        break;
       case Mov:
         assert(castable(t1, t2));
+        if(t1.type == Types::Function) {
+          TypeFunction result;
+          result.retType = new Type(Type::merge(Mov, *t1.fn.retType, *t2.fn.retType));
+          for(size_t i = 0, l = t1.fn.args.size(); i < l; ++i) {
+            result.args.push_back(new Type(Type::merge(Mov, *t1.fn.args[i], *t2.fn.args[i])));
+          }
+          return result;
+        }
         return t1;
       default:
         assert(false);
@@ -295,6 +328,10 @@ namespace pickc::pcir
   bool Type::isBool() const
   {
     return type == Types::Bool;
+  }
+  bool Type::isNull() const
+  {
+    return type == Types::Null;
   }
   bool Type::isChar() const
   {
@@ -336,6 +373,7 @@ namespace pickc::pcir
       case Types::Char: return 8;
       case Types::Array: return array.elem->size() * array.length;
       case Types::Ptr: return 0;
+      case Types::Null: return 0;
       case Types::Function: return 0;
       case Types::UserDefine: assert(false); return 0; // TODO
       case Types::Generics: assert(false); return 0; // TODO
@@ -360,6 +398,7 @@ namespace pickc::pcir
       case Types::F64: return "f64";
       case Types::Void: return "void";
       case Types::Bool: return "bool";
+      case Types::Null: return "null";
       case Types::Char: return "char";
       case Types::Array: return "[" + array.elem->toString() + " x " + std::to_string(array.length) + "]";
       case Types::Ptr: return "ptr<" + ptr.elem->toString() + ">";

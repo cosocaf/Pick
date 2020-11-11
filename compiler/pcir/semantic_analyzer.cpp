@@ -23,7 +23,7 @@ namespace pickc::pcir
   Option<std::vector<std::string>> SemanticAnalyzer::declare(ModuleTree* tree)
   {
     std::vector<std::string> errors;
-    if(auto errs = ModuleAnalyzer(this, tree).declare()) errors += errs.get();
+    if(auto errs = ModuleAnalyzer(this, tree, trees).declare()) errors += errs.get();
     for(auto sub : tree->submodules) if(auto errs = declare(sub.second)) errors += errs.get();
     if(errors.empty()) return none;
     return some(errors);
@@ -31,7 +31,7 @@ namespace pickc::pcir
   Option<std::vector<std::string>> SemanticAnalyzer::analyze(ModuleTree* tree)
   {
     std::vector<std::string> errors;
-    if(auto errs = ModuleAnalyzer(this, tree).analyze()) errors += errs.get();
+    if(auto errs = ModuleAnalyzer(this, tree, trees).analyze()) errors += errs.get();
     for(auto sub : tree->submodules) if(auto errs = analyze(sub.second)) errors += errs.get();
     if(errors.empty()) return none;
     return some(errors);
@@ -42,8 +42,11 @@ namespace pickc::pcir
     modules[mod->name] = &mod->module;
     for(auto& sym : mod->module.symbols) {
       texts.insert(sym.first);
-      for(const auto& reg : sym.second->init->regs) {
-        insertType(reg->type);
+      insertType(sym.second->type);
+      if(sym.second->init) {
+        for(const auto& reg : sym.second->init->regs) {
+          insertType(reg->type);
+        }
       }
       symbols.push_back(sym.second);
     }
@@ -51,6 +54,13 @@ namespace pickc::pcir
       insertType(fn->type);
       for(auto& reg : fn->regs) {
         insertType(reg->type);
+      }
+      for(auto& flow : fn->flows) {
+        for(auto& inst : flow->insts) {
+          if(instanceof<LoadStringInstruction>(inst)) {
+            texts.insert(dynCast<LoadStringInstruction>(inst)->value);
+          }
+        }
       }
       functions[fn];
     }
@@ -72,157 +82,194 @@ namespace pickc::pcir
   }
   BinaryVec SemanticAnalyzer::compileFunction(const Function* fn)
   {
-    std::vector<BinaryVec> flows;
-    for(const auto& flow : fn->flows) {
-      BinaryVec code;
-      for(const auto inst : flow->insts) {
-        if(instanceof<BinaryInstruction>(inst)) {
-          auto bin = dynCast<BinaryInstruction>(inst);
-          switch(bin->inst) {
-            case BinaryInstructions::Add: code << Add; break;
-            case BinaryInstructions::Sub: code << Sub; break;
-            case BinaryInstructions::Mul: code << Mul; break;
-            case BinaryInstructions::Div: code << Div; break;
-            case BinaryInstructions::Mod: code << Mod; break;
-            case BinaryInstructions::EQ: code << EQ; break;
-            case BinaryInstructions::NEQ: code << NEQ; break;
-            case BinaryInstructions::GT: code << GT; break;
-            case BinaryInstructions::GE: code << GE; break;
-            case BinaryInstructions::LT: code << LT; break;
-            case BinaryInstructions::LE: code << LE; break;
-            default: assert(false);
-          }
-          code << static_cast<uint32_t>(indexOf(fn->regs, bin->dist));
-          code << static_cast<uint32_t>(indexOf(fn->regs, bin->left));
-          code << static_cast<uint32_t>(indexOf(fn->regs, bin->right));
-        }
-        else if(instanceof<UnaryInstruction>(inst)) {
-          auto uni = dynCast<UnaryInstruction>(inst);
-          switch(uni->inst) {
-            case UnaryInstructions::Inc: code << Inc; break;
-            case UnaryInstructions::Dec: code << Dec; break;
-            case UnaryInstructions::Pos: code << Pos; break;
-            case UnaryInstructions::Neg: code << Neg; break;
-            default: assert(false);
-          }
-          code << static_cast<uint32_t>(indexOf(fn->regs, uni->dist));
-          code << static_cast<uint32_t>(indexOf(fn->regs, uni->reg));
-        }
-        else if(instanceof<ImmMove>(inst)) {
-          auto imm = dynCast<ImmMove>(inst);
-          code << Imm;
-          code << static_cast<uint32_t>(indexOf(fn->regs, imm->dist));
-          switch(imm->dist->type.type) {
-            case Types::I8: code << imm->imm.i8; break;
-            case Types::I16: code << imm->imm.i16; break;
-            case Types::I32: code << imm->imm.i32; break;
-            case Types::I64: code << imm->imm.i64; break;
-            default: assert(false);
-          }
-        }
-        else if(instanceof<CallInstruction>(inst)) {
-          auto call = dynCast<CallInstruction>(inst);
-          code << Call;
-          code << static_cast<uint32_t>(indexOf(fn->regs, call->dist));
-          code << static_cast<uint32_t>(indexOf(fn->regs, call->fn));
-          for(auto& arg : call->args) {
-            code << static_cast<uint32_t>(indexOf(fn->regs, arg));
-          }
-        }
-        else if(instanceof<LoadFnInstruction>(inst)) {
-          auto loadFn = dynCast<LoadFnInstruction>(inst);
-          code << LoadFn;
-          code << static_cast<uint32_t>(indexOf(fn->regs, loadFn->reg));
-          code << static_cast<uint32_t>(indexOf(functions, loadFn->fn));
-        }
-        else if(instanceof<LoadArgInstruction>(inst)) {
-          auto loadArg = dynCast<LoadArgInstruction>(inst);
-          code << LoadArg;
-          code << static_cast<uint32_t>(indexOf(fn->regs, loadArg->reg));
-          code << loadArg->indexOfArg;
-        }
-        else if(instanceof<LoadSymbolInstruction>(inst)) {
-          auto loadSymbol = dynCast<LoadSymbolInstruction>(inst);
-          code << LoadSymbol;
-          code << static_cast<uint32_t>(indexOf(fn->regs, loadSymbol->reg));
-          code << static_cast<uint32_t>(indexOf(texts, loadSymbol->name));
-        }
-        else if(instanceof<MovInstruction>(inst)) {
-          auto mov = dynCast<MovInstruction>(inst);
-          code << Mov;
-          code << static_cast<uint32_t>(indexOf(fn->regs, mov->dist));
-          code << static_cast<uint32_t>(indexOf(fn->regs, mov->src));
-        }
-        else if(instanceof<PhiInstruction>(inst)) {
-          auto phi = dynCast<PhiInstruction>(inst);
-          code << Phi;
-          code << static_cast<uint32_t>(indexOf(fn->regs, phi->dist));
-          code << static_cast<uint32_t>(indexOf(fn->regs, phi->r1));
-          code << static_cast<uint32_t>(indexOf(fn->regs, phi->r2));
-        }
-        else {
-          assert(false);
-        }
-      }
+    BinaryVec result;
+    result << static_cast<uint32_t>(indexOf(types, fn->type));
 
-      BinaryVec flowVec;
-      uint32_t typeFlag = 0;
-      switch(flow->type) {
-        case FlowType::Normal:
-          typeFlag |= FLOW_TYPE_NORMAL;
-          break;
-        case FlowType::ConditionalBranch:
-          typeFlag |= FLOW_TYPE_COND_BRANCH;
-          break;
-        case FlowType::EndPoint:
-          typeFlag |= FLOW_TYPE_END_POINT;
-          break;
-        default:
-          assert(false);
-      }
-      flowVec << typeFlag;
-      if(includes(fn->flows, flow->parentFlow)) {
-        flowVec << static_cast<uint32_t>(indexOf(fn->flows, flow->parentFlow));
-      }
-      else {
-        flowVec << static_cast<uint32_t>(-1);
-      }
-      if(typeFlag & FLOW_TYPE_NORMAL) {
-        flowVec << static_cast<uint32_t>(indexOf(fn->flows, flow->nextFlow));
-      }
-      else if(typeFlag & FLOW_TYPE_COND_BRANCH) {
-        flowVec << static_cast<uint32_t>(indexOf(fn->regs, flow->cond));
-        flowVec << static_cast<uint32_t>(indexOf(fn->flows, flow->thenFlow));
-        flowVec << static_cast<uint32_t>(indexOf(fn->flows, flow->elseFlow));
-      }
-      else if(typeFlag & FLOW_TYPE_END_POINT) {
-        if(flow->retReg != nullptr) {
-          flowVec << static_cast<uint32_t>(indexOf(fn->regs, flow->retReg));
+    if(fn->fType == FunctionType::Function) {
+      std::vector<BinaryVec> flows;
+      for(const auto& flow : fn->flows) {
+        BinaryVec code;
+        for(const auto inst : flow->insts) {
+          if(instanceof<BinaryInstruction>(inst)) {
+            auto bin = dynCast<BinaryInstruction>(inst);
+            switch(bin->inst) {
+              case BinaryInstructions::Add: code << Add; break;
+              case BinaryInstructions::Sub: code << Sub; break;
+              case BinaryInstructions::Mul: code << Mul; break;
+              case BinaryInstructions::Div: code << Div; break;
+              case BinaryInstructions::Mod: code << Mod; break;
+              case BinaryInstructions::EQ: code << EQ; break;
+              case BinaryInstructions::NEQ: code << NEQ; break;
+              case BinaryInstructions::GT: code << GT; break;
+              case BinaryInstructions::GE: code << GE; break;
+              case BinaryInstructions::LT: code << LT; break;
+              case BinaryInstructions::LE: code << LE; break;
+              default: assert(false);
+            }
+            code << static_cast<uint32_t>(indexOf(fn->regs, bin->dist));
+            code << static_cast<uint32_t>(indexOf(fn->regs, bin->left));
+            code << static_cast<uint32_t>(indexOf(fn->regs, bin->right));
+          }
+          else if(instanceof<UnaryInstruction>(inst)) {
+            auto uni = dynCast<UnaryInstruction>(inst);
+            switch(uni->inst) {
+              case UnaryInstructions::Inc: code << Inc; break;
+              case UnaryInstructions::Dec: code << Dec; break;
+              case UnaryInstructions::Pos: code << Pos; break;
+              case UnaryInstructions::Neg: code << Neg; break;
+              default: assert(false);
+            }
+            code << static_cast<uint32_t>(indexOf(fn->regs, uni->dist));
+            code << static_cast<uint32_t>(indexOf(fn->regs, uni->reg));
+          }
+          else if(instanceof<ImmMove>(inst)) {
+            auto imm = dynCast<ImmMove>(inst);
+            code << Imm;
+            code << static_cast<uint32_t>(indexOf(fn->regs, imm->dist));
+            switch(imm->dist->type.type) {
+              case Types::I8: code << imm->imm.i8; break;
+              case Types::I16: code << imm->imm.i16; break;
+              case Types::I32: code << imm->imm.i32; break;
+              case Types::I64: code << imm->imm.i64; break;
+              case Types::Integer: code << imm->imm.i32; break;
+              case Types::Null: break;
+              case Types::Char: code << imm->imm.c; break;
+              default: assert(false);
+            }
+          }
+          else if(instanceof<CallInstruction>(inst)) {
+            auto call = dynCast<CallInstruction>(inst);
+            code << Call;
+            code << static_cast<uint32_t>(indexOf(fn->regs, call->dist));
+            code << static_cast<uint32_t>(indexOf(fn->regs, call->fn));
+            for(auto& arg : call->args) {
+              code << static_cast<uint32_t>(indexOf(fn->regs, arg));
+            }
+          }
+          else if(instanceof<LoadFnInstruction>(inst)) {
+            auto loadFn = dynCast<LoadFnInstruction>(inst);
+            code << LoadFn;
+            code << static_cast<uint32_t>(indexOf(fn->regs, loadFn->reg));
+            code << static_cast<uint32_t>(indexOf(functions, loadFn->fn));
+          }
+          else if(instanceof<LoadArgInstruction>(inst)) {
+            auto loadArg = dynCast<LoadArgInstruction>(inst);
+            code << LoadArg;
+            code << static_cast<uint32_t>(indexOf(fn->regs, loadArg->reg));
+            code << loadArg->indexOfArg;
+          }
+          else if(instanceof<LoadSymbolInstruction>(inst)) {
+            auto loadSymbol = dynCast<LoadSymbolInstruction>(inst);
+            code << LoadSymbol;
+            code << static_cast<uint32_t>(indexOf(fn->regs, loadSymbol->reg));
+            code << static_cast<uint32_t>(indexOf(texts, loadSymbol->name));
+          }
+          else if(instanceof<LoadStringInstruction>(inst)) {
+            auto loadString = dynCast<LoadStringInstruction>(inst);
+            code << LoadString;
+            code << static_cast<uint32_t>(indexOf(fn->regs, loadString->reg));
+            code << static_cast<uint32_t>(indexOf(texts, loadString->value));
+          }
+          else if(instanceof<LoadElemInstruction>(inst)) {
+            auto loadElem = dynCast<LoadElemInstruction>(inst);
+            code << LoadElem;
+            code << static_cast<uint32_t>(indexOf(fn->regs, loadElem->dist));
+            code << static_cast<uint32_t>(indexOf(fn->regs, loadElem->array));
+            code << static_cast<uint32_t>(indexOf(fn->regs, loadElem->index));
+          }
+          else if(instanceof<AllocInstruction>(inst)) {
+            auto alloc = dynCast<AllocInstruction>(inst);
+            code << Alloc;
+            code << static_cast<uint32_t>(indexOf(fn->regs, alloc->dist));
+            code << static_cast<uint32_t>(indexOf(fn->regs, alloc->src));
+          }
+          else if(instanceof<MovInstruction>(inst)) {
+            auto mov = dynCast<MovInstruction>(inst);
+            code << Mov;
+            code << static_cast<uint32_t>(indexOf(fn->regs, mov->dist));
+            code << static_cast<uint32_t>(indexOf(fn->regs, mov->src));
+          }
+          else if(instanceof<PhiInstruction>(inst)) {
+            auto phi = dynCast<PhiInstruction>(inst);
+            code << Phi;
+            code << static_cast<uint32_t>(indexOf(fn->regs, phi->dist));
+            code << static_cast<uint32_t>(indexOf(fn->regs, phi->r1));
+            code << static_cast<uint32_t>(indexOf(fn->regs, phi->r2));
+          }
+          else {
+            assert(false);
+          }
+        }
+
+        BinaryVec flowVec;
+        uint32_t typeFlag = 0;
+        switch(flow->type) {
+          case FlowType::Normal:
+            typeFlag |= FLOW_TYPE_NORMAL;
+            break;
+          case FlowType::ConditionalBranch:
+            typeFlag |= FLOW_TYPE_COND_BRANCH;
+            break;
+          case FlowType::EndPoint:
+            typeFlag |= FLOW_TYPE_END_POINT;
+            break;
+          default:
+            assert(false);
+        }
+        flowVec << typeFlag;
+        if(includes(fn->flows, flow->parentFlow)) {
+          flowVec << static_cast<uint32_t>(indexOf(fn->flows, flow->parentFlow));
         }
         else {
           flowVec << static_cast<uint32_t>(-1);
         }
+        if(typeFlag & FLOW_TYPE_NORMAL) {
+          flowVec << static_cast<uint32_t>(indexOf(fn->flows, flow->nextFlow));
+        }
+        else if(typeFlag & FLOW_TYPE_COND_BRANCH) {
+          flowVec << static_cast<uint32_t>(indexOf(fn->regs, flow->cond));
+          flowVec << static_cast<uint32_t>(indexOf(fn->flows, flow->thenFlow));
+          flowVec << static_cast<uint32_t>(indexOf(fn->flows, flow->elseFlow));
+        }
+        else if(typeFlag & FLOW_TYPE_END_POINT) {
+          if(flow->retReg != nullptr) {
+            flowVec << static_cast<uint32_t>(indexOf(fn->regs, flow->retReg));
+          }
+          else {
+            flowVec << static_cast<uint32_t>(-1);
+          }
+        }
+        flowVec << static_cast<uint32_t>(code.size());
+        flowVec << code;
+        flows.push_back(flowVec);
       }
-      flowVec << static_cast<uint32_t>(code.size());
-      flowVec << code;
-      flows.push_back(flowVec);
-    }
 
-    BinaryVec result;
-    result << static_cast<uint32_t>(indexOf(types, fn->type));
-    result << static_cast<uint32_t>(fn->regs.size());
-    for(const auto& reg : fn->regs) {
-      result << static_cast<uint32_t>(indexOf(types, reg->type));
+      result << FN_TYPE_FUNCTION;
+      result << static_cast<uint32_t>(fn->regs.size());
+      for(const auto& reg : fn->regs) {
+        result << static_cast<uint32_t>(indexOf(types, reg->type));
+      }
+      result << static_cast<uint32_t>(flows.size());
+      result << static_cast<uint32_t>(0);
+      for(const auto& flow : flows) {
+        result << flow;
+      }
     }
-    result << static_cast<uint32_t>(flows.size());
-    result << static_cast<uint32_t>(0);
-    for(const auto& flow : flows) {
-      result << flow;
+    else if(fn->fType == FunctionType::Extern) {
+      result << FN_TYPE_EXTERN;
+      result << static_cast<uint32_t>(indexOf(texts, fn->externName));
     }
+    else {
+      assert(false);
+    }
+    
     return result;
   }
   Option<std::vector<std::string>> SemanticAnalyzer::write(const CompilerOption& option)
   {
+    trees.insert(rootTree);
+    // TODO: load pcirs
+
     if(auto err = declare(rootTree)) return some(err.get());
     if(auto err = analyze(rootTree)) return some(err.get());
 
@@ -259,6 +306,7 @@ namespace pickc::pcir
       else if(type.isFloat()) typeSection << TYPE_FLOAT << type.size();
       else if(type.isVoid()) typeSection << TYPE_VOID << type.size();
       else if(type.isBool()) typeSection << TYPE_BOOL << type.size();
+      else if(type.isNull()) typeSection << TYPE_NULL << type.size();
       else if(type.isChar()) typeSection << TYPE_CHAR << type.size();
       else if(type.isArray())
         typeSection << TYPE_ARRAY << type.size()

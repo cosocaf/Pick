@@ -47,6 +47,8 @@ namespace pickc::pcir
   struct FunctionSection
   {
     TypeSection* type;
+    uint32_t fnType;
+    TextSection* externName;
     std::vector<RegisterStruct*> regs;
     std::vector<FlowStruct*> flows;
     FlowStruct* entryFlow;

@@ -16,6 +16,7 @@ add_library(
   module_analyzer_impl/var_def_analyze.cpp
   module_analyzer_impl/fn_def_analyze.cpp
   module_analyzer_impl/if_analyze.cpp
+  module_analyzer_impl/while_analyze.cpp
 )
 
 target_include_directories(pcir PRIVATE ${ROOT_DIR} ${CMAKE_CURRENT_SOURCE_DIR})

@@ -105,6 +105,7 @@ namespace pickc::parser
     F32,              // [0-9].[0-9]+f32
     F64,              // [0-9].[0-9]+f64
     Bool,             // true|false
+    Null,             // null
     Char,             // 'x'
     String,           // "xxx"
     This,             // this

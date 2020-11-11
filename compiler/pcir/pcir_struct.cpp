@@ -73,7 +73,7 @@ namespace pickc::pcir
         switch(sizeOfType) {
           case 32: type = Types::F32; break;
           case 64: type = Types::F64; break;
-          default: return error(std::vector{ path + "は適切PCIRファイルではありません。浮動小数型は32bitまたは64bitでなければなりません。" });
+          default: return error(std::vector{ path + "は適切なPCIRファイルではありません。浮動小数型は32bitまたは64bitでなければなりません。" });
         }
         file.typeSection.push_back(new TypeSection{ type, Type(type) });
       }
@@ -82,6 +82,9 @@ namespace pickc::pcir
       }
       else if(flag == TYPE_BOOL) {
         file.typeSection.push_back(new TypeSection{ Types::Bool, Type(Types::Bool) });
+      }
+      else if(flag == TYPE_NULL) {
+        file.typeSection.push_back(new TypeSection{ Types::Null, Type(Types::Null) });
       }
       else if(flag == TYPE_CHAR) {
         file.typeSection.push_back(new TypeSection{ Types::Char, Type(Types::Char) });
@@ -147,72 +150,89 @@ namespace pickc::pcir
       uint32_t type;
       stream.read((char*)&type, 4);
       fn->type = file.typeSection[type];
-      uint32_t numOfRegs;
-      stream.read((char*)&numOfRegs, 4);
-      fn->regs.reserve(numOfRegs);
-      for(uint32_t j = 0; j < numOfRegs; ++j) {
-        uint32_t type;
-        stream.read((char*)&type, 4);
-        fn->regs.push_back(new RegisterStruct{ file.typeSection[type] });
-      }
-      uint32_t numFlows;
-      stream.read((char*)&numFlows, 4);
-      uint32_t entryFlow;
-      stream.read((char*)&entryFlow, 4);
-      fn->flows.reserve(numFlows);
-      for(uint32_t j = 0; j < numFlows; ++j) {
-        fn->flows.push_back(new FlowStruct());
-      }
-      for(auto& flow : fn->flows) {
-        stream.read((char*)&flow->flowType, 4);
-        uint32_t indexOfParentFlow;
-        stream.read((char*)&indexOfParentFlow, 4);
-        if(indexOfParentFlow == -1) {
-          flow->parent = nullptr;
+      uint32_t fnType;
+      stream.read((char*)&fnType, 4);
+      fn->fnType = fnType;
+      if(fn->fnType == FN_TYPE_FUNCTION) {
+        uint32_t numOfRegs;
+        stream.read((char*)&numOfRegs, 4);
+        fn->regs.reserve(numOfRegs);
+        for(uint32_t j = 0; j < numOfRegs; ++j) {
+          uint32_t type;
+          stream.read((char*)&type, 4);
+          fn->regs.push_back(new RegisterStruct{ file.typeSection[type] });
         }
-        else {
-          flow->parent = fn->flows[indexOfParentFlow];
+        uint32_t numFlows;
+        stream.read((char*)&numFlows, 4);
+        uint32_t entryFlow;
+        stream.read((char*)&entryFlow, 4);
+        fn->flows.reserve(numFlows);
+        for(uint32_t j = 0; j < numFlows; ++j) {
+          fn->flows.push_back(new FlowStruct());
         }
-        if(flow->flowType & FLOW_TYPE_NORMAL) {
-          uint32_t indexOfNextFlow;
-          stream.read((char*)&indexOfNextFlow, 4);
-          if(indexOfNextFlow == -1) {
-            flow->next = nullptr;
+        for(auto& flow : fn->flows) {
+          stream.read((char*)&flow->flowType, 4);
+          uint32_t indexOfParentFlow;
+          stream.read((char*)&indexOfParentFlow, 4);
+          if(indexOfParentFlow == -1) {
+            flow->parent = nullptr;
           }
           else {
-            flow->next = fn->flows[indexOfNextFlow];
+            flow->parent = fn->flows[indexOfParentFlow];
           }
-        }
-        else if(flow->flowType & FLOW_TYPE_COND_BRANCH) {
-          uint32_t indexOfComp;
-          stream.read((char*)&indexOfComp, 4);
-          uint32_t indexOfThenFlow;
-          stream.read((char*)&indexOfThenFlow, 4);
-          uint32_t indexOfElseFlow;
-          stream.read((char*)&indexOfElseFlow, 4);
-          flow->cond = fn->regs[indexOfComp];
-          flow->thenFlow = fn->flows[indexOfThenFlow];
-          flow->elseFlow = fn->flows[indexOfElseFlow];
-        }
-        else if(flow->flowType & FLOW_TYPE_END_POINT) {
-          uint32_t indexOfRetReg;
-          stream.read((char*)&indexOfRetReg, 4);
-          if(indexOfRetReg == -1) {
-            flow->retReg = nullptr;
+          if(flow->flowType & FLOW_TYPE_NORMAL) {
+            uint32_t indexOfNextFlow;
+            stream.read((char*)&indexOfNextFlow, 4);
+            if(indexOfNextFlow == -1) {
+              flow->next = nullptr;
+            }
+            else {
+              flow->next = fn->flows[indexOfNextFlow];
+            }
+          }
+          else if(flow->flowType & FLOW_TYPE_COND_BRANCH) {
+            uint32_t indexOfComp;
+            stream.read((char*)&indexOfComp, 4);
+            uint32_t indexOfThenFlow;
+            stream.read((char*)&indexOfThenFlow, 4);
+            uint32_t indexOfElseFlow;
+            stream.read((char*)&indexOfElseFlow, 4);
+            flow->cond = fn->regs[indexOfComp];
+            flow->thenFlow = fn->flows[indexOfThenFlow];
+            flow->elseFlow = fn->flows[indexOfElseFlow];
+          }
+          else if(flow->flowType & FLOW_TYPE_END_POINT) {
+            uint32_t indexOfRetReg;
+            stream.read((char*)&indexOfRetReg, 4);
+            if(indexOfRetReg == -1) {
+              flow->retReg = nullptr;
+            }
+            else {
+              flow->retReg = fn->regs[indexOfRetReg];
+            }
           }
           else {
-            flow->retReg = fn->regs[indexOfRetReg];
+            assert(false);
+            return error(std::vector{ path + "は適切なPCIRファイルではありません。FLOW_TYPEが予期しないものでした。" });
           }
+          uint32_t sizeOfCodes;
+          stream.read((char*)&sizeOfCodes, 4);
+          auto code = new uint8_t[sizeOfCodes];
+          stream.read((char*)code, sizeOfCodes);
+          flow->code.reserve(sizeOfCodes);
+          flow->code.insert(flow->code.end(), code, code + sizeOfCodes);
+          delete[] code;
         }
-        uint32_t sizeOfCodes;
-        stream.read((char*)&sizeOfCodes, 4);
-        auto code = new uint8_t[sizeOfCodes];
-        stream.read((char*)code, sizeOfCodes);
-        flow->code.reserve(sizeOfCodes);
-        flow->code.insert(flow->code.end(), code, code + sizeOfCodes);
-        delete[] code;
+        fn->entryFlow = fn->flows[entryFlow];
       }
-      fn->entryFlow = fn->flows[entryFlow];
+      else if(fn->fnType == FN_TYPE_EXTERN) {
+        uint32_t name;
+        stream.read((char*)&name, 4);
+        fn->externName = file.textSection[name];
+      }
+      else {
+        return error(std::vector{ path + "は適切なPCIRファイルではありません。FN_TYPEが予期しないものでした。" });
+      }
       file.fnSection.push_back(fn);
     }
 

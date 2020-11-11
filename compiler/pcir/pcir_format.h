@@ -21,14 +21,21 @@ namespace pickc::pcir
   constexpr uint32_t TYPE_PTR = 0x00000010;
   // ブール型を表す。
   constexpr uint32_t TYPE_BOOL = 0x00000020;
+  // null型を表す。
+  constexpr uint32_t TYPE_NULL = 0x00000040;
   // 文字型を表す。
-  constexpr uint32_t TYPE_CHAR = 0x00000040;
+  constexpr uint32_t TYPE_CHAR = 0x00000080;
   // 関数型を表す。
-  constexpr uint32_t TYPE_FUNCTION = 0x00000080;
+  constexpr uint32_t TYPE_FUNCTION = 0x00000100;
   // ユーザー定義型を表す。
-  constexpr uint32_t TYPE_USER_DEFINE = 0x00000100;
+  constexpr uint32_t TYPE_USER_DEFINE = 0x00000200;
   // ジェネリクス型を表す。
-  constexpr uint32_t TYPE_GENERICS = 0x00000200;
+  constexpr uint32_t TYPE_GENERICS = 0x00000400;
+
+  // 通常の関数であることを表す。
+  constexpr uint32_t FN_TYPE_FUNCTION = 0x00000001;
+  // extern関数であることを表す。
+  constexpr uint32_t FN_TYPE_EXTERN = 0x00000002;
 
   // 通常のフローであることを表す。
   constexpr uint32_t FLOW_TYPE_NORMAL = 0x00000001;
@@ -161,7 +168,7 @@ namespace pickc::pcir
     uint32_t name;                        // Index of symbol name in text section.
     uint32_t access;                      // symbol access flags. ACCESS_*
     uint32_t type;                        // Index of type name in text section.
-    uint32_t init;                        // Index of init function in function table section.
+    uint32_t init;                        // Index of init function in function table section. If access == ACCESS_EXTERN, set it to 0.
   };
   struct PCIRFunctionTableHeader
   {
@@ -200,11 +207,21 @@ namespace pickc::pcir
   struct PCIRFunction
   {
     uint32_t type;                        // Index of type in type section.
+    uint32_t fnType;                      // FN_TYPE_*
+    // PCIRNomalFunction nFn;             // fnType == FN_TYPE_FUNCTION
+    // PCIRExternFunction eFn;            // fnType == FN_TYPE_EXTERN
+  };
+  struct PCIRNormalFunction
+  {
     uint32_t numOfRegisters;              // Number of virtual registers.
     // PCIRRegister[numOfRegisters];      // regs.
     uint32_t numOfFlows;                  // Number of flows.
     uint32_t indexOfEntryFlow;            // Index of entry flow.
     // PCIRFlow flows[numOfFlows];        // blocks
+  };
+  struct PCIRExternFunction
+  {
+    uint32_t indexOfName;                 // Index of name in text section.
   };
 }
 

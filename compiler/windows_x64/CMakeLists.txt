@@ -6,9 +6,14 @@ add_library(
   routine_compiler.cpp
   compiler.cpp
   linker.cpp
+  lib_loader.cpp
   type.cpp
   operation_impl/binary_operations.cpp
+  operation_impl/mul_div_operations.cpp
   operation_impl/mov_operation.cpp
+  operation_impl/neg_operation.cpp
+  operation_impl/convert_operations.cpp
+  operation_impl/lea_operation.cpp
   operation_impl/push_pop_operation.cpp
   operation_impl/epilogue_operations.cpp
   operation_impl/call_operation.cpp

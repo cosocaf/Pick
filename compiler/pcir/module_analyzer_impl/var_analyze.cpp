@@ -12,18 +12,20 @@ namespace pickc::pcir
     if(instanceof<ScopedVariableNode>(var) || !(flowVar = (*flow)->findVar(var->name))) {
       if(auto symbol = findGlobalVar(var)) {
         reg = new Register();
-        reg->type = symbol->type;
+        reg->type = symbol.get()->type;
         auto loadSymbol = new LoadSymbolInstruction();
         loadSymbol->reg = reg;
-        loadSymbol->name = symbol->fullyQualifiedName;
+        loadSymbol->name = symbol.get()->fullyQualifiedName;
         (*flow)->addReg(reg);
         (*flow)->insts.push_back(loadSymbol);
+      }
+      else {
+        return error(symbol.err());
       }
     }
     else {
       reg = flowVar->reg;
     }
-    if(!reg) return error(std::vector{ createSemanticError(var, "変数 " + var->name + " は定義されていません。") });
     return ok(reg);
   }
 }

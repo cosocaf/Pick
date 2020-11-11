@@ -14,8 +14,6 @@ namespace pickc::windows::x64
 {
   enum struct RegisterInfo
   {
-    // ルーチン自身の引数
-    Argument,
     // ルーチン中で一度も使用していない。
     Unused,
     // ルーチン中で現在使用中。
@@ -73,6 +71,7 @@ namespace pickc::windows::x64
       Register::R8,
       Register::R9
     };
+    WindowsX64* x64;
     Routine* routine;
     std::vector<Operation*> prologue;
     std::vector<Operation*> body;
@@ -99,7 +98,7 @@ namespace pickc::windows::x64
     void freeRegs();
     OperationSize getSize(const pcir::TypeSection* type);
   public:
-    RoutineCompiler(bundler::Function* fn);
+    RoutineCompiler(bundler::Function* fn, WindowsX64* x64);
     Result<Routine*, std::vector<std::string>> compile();
   };
 }

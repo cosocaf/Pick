@@ -35,14 +35,18 @@ namespace pickc::pcir
       reg = new Register();
       reg->type = expectedType;
     }
-    (*flow)->vars.insert(new Variable{
-      varDef->name->name,
-      varDef->isMut ? Mutability::Mutable : Mutability::Immutable,
-      VariableStatus::InUse,
-      expectedType,
-      reg
-    });
-    if(errors.empty()) return ok(reg);
+    if(errors.empty()) {
+      reg->curVar = new Variable{
+        varDef->name->name,
+        varDef->isMut ? Mutability::Mutable : Mutability::Immutable,
+        VariableStatus::InUse,
+        expectedType,
+        reg
+      };
+      (*flow)->vars.insert(reg->curVar);
+      return ok(reg);
+    }
+    
     return error(errors);
   }
 }

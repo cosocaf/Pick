@@ -1,6 +1,7 @@
 #include "module_analyzer.h"
 
 #include "utils/vector_utils.h"
+#include "utils/instanceof.h"
 
 namespace pickc::pcir
 {
@@ -26,13 +27,15 @@ namespace pickc::pcir
       arg->type = Type(argDef->type);
       fn->args.push_back(argDef->name->name);
       fn->regs.push_back(arg);
-      fn->entryFlow->vars.insert(new Variable{
+      auto var = new Variable{
         argDef->name->name,
         argDef->isMut ? Mutability::Mutable : Mutability::Immutable,
         VariableStatus::InUse,
         arg->type,
         arg
-      });
+      };
+      arg->curVar = var;
+      fn->entryFlow->vars.insert(var);
       if(argDef->init) {
         fn->defaultArgs[argDef->name->name].flow = new FlowNode();
         fn->defaultArgs[argDef->name->name].flow->belong = fn;
@@ -53,18 +56,30 @@ namespace pickc::pcir
     }
 
     fn->type = type;
-    auto curFlow = fn->entryFlow;
-    if(auto body = exprAnalyze(fnDef->body, &curFlow)) {
-      if(body.get()) {
-        if(!Type::castable(*fn->type.fn.retType, body.get()->type)) {
-          errors.push_back(createSemanticError(fnDef, "関数は " + fn->type.fn.retType->toString() + " を返しますが、" + body.get()->type.toString() + " が返されました。"));
-        }
-        *fn->type.fn.retType = Type::merge(Mov, *fn->type.fn.retType, body.get()->type);
-        curFlow->type = FlowType::EndPoint;
-        curFlow->retReg = body.get();
-      }
+    if(instanceof<parser::ExternNode>(fnDef)) {
+      fn->fType = FunctionType::Extern;
+      fn->externName = fnDef->name->name;
     }
+    else {
+      fn->fType = FunctionType::Function;
+      auto curFlow = fn->entryFlow;
+      if(auto body = exprAnalyze(fnDef->body, &curFlow)) {
+        if(body.get()) {
+          if(!Type::castable(*fn->type.fn.retType, body.get()->type)) {
+            errors.push_back(createSemanticError(fnDef, "関数は " + fn->type.fn.retType->toString() + " を返しますが、" + body.get()->type.toString() + " が返されました。"));
+          }
+          else {
+            *fn->type.fn.retType = Type::merge(Mov, *fn->type.fn.retType, body.get()->type);
+            curFlow->type = FlowType::EndPoint;
+            curFlow->retReg = body.get();
+          }
+        }
+        else {
+          curFlow->type = FlowType::EndPoint;
+        }
+      }
     else errors += body.err();
+    }
     
     if(errors.empty()) {
       auto reg = new Register();

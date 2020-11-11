@@ -143,6 +143,14 @@ namespace pickc::parser
   public:
     virtual void dump(const std::string& indent, const std::string& indent2) const override;
   };
+  class WhileNode : public PrimaryNode
+  {
+  public:
+    ExpressionNode* comp;
+    ExpressionNode* body;
+  public:
+    virtual void dump(const std::string& indent, const std::string& indent2) const override;
+  };
   class VariableNode : public PrimaryNode
   {
   public:
@@ -263,6 +271,11 @@ namespace pickc::parser
     bool value;
   public:
     BoolLiteral(bool value);
+    virtual void dump(const std::string& indent, const std::string& indent2) const override;
+  };
+  class NullLiteral : public LiteralNode
+  {
+  public:
     virtual void dump(const std::string& indent, const std::string& indent2) const override;
   };
   class CharLiteral : public LiteralNode
@@ -548,12 +561,8 @@ namespace pickc::parser
     ImportNode(VariableNode* name);
     virtual void dump(const std::string& indent, const std::string& indent2) const override;
   };
-  class ExternNode : public Node
+  class ExternNode : public FunctionDefineNode
   {
-  public:
-    VariableNode* name;
-    std::vector<ArgumentDefineNode*> args;
-    TypeNode* retType;
   public:
     virtual void dump(const std::string& indent, const std::string& indent2) const override;
   };

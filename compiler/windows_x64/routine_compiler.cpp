@@ -15,7 +15,7 @@
 
 namespace pickc::windows::x64
 {
-  RoutineCompiler::RoutineCompiler(bundler::Function* fn) : routine(new Routine{ fn }) {};
+  RoutineCompiler::RoutineCompiler(bundler::Function* fn, WindowsX64* x64) : routine(new Routine{ fn }), x64(x64) {};
   Result<Routine*, std::vector<std::string>> RoutineCompiler::compile()
   {
     std::vector<std::string> errors;
@@ -35,17 +35,18 @@ namespace pickc::windows::x64
     minStack = 0;
 
     for(size_t i = 0, l = routine->fn->type->type.fn.args.size(); i < l; ++i) {
-      if(i < 4) {
-        regInfo[*(argRegs.begin() + i)] = RegisterInfo::Argument;
-        args.push_back(Operand(*(argRegs.begin() + i)));
-      }
-      else {
-        args.push_back(Operand(Memory(Register::RBP, (routine->fn->type->type.fn.args.size() - i) * 8, false)));
-      }
+      args.push_back(Operand(Memory(Register::RBP, (routine->fn->type->type.fn.args.size() - i + 1) * 8, 8, false)));
     }
 
     prologue.push_back(new PushOperation(Operand(Register::RBP)));
     prologue.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RBP), Operand(Register::RSP)));
+
+    for(size_t i = 0, l = args.size(); i < l; ++i) {
+      args[i] = Operand(Memory(Register::RBP, (i + 1) * 8 + 8, 8, false));
+      if(i < 4) {
+        prologue.push_back(new MovOperation(OperationSize::QWord, args[i], Operand(*(argRegs.begin() + i))));
+      }
+    }
 
     std::set<size_t> insertEpilogue;
 
@@ -89,7 +90,15 @@ namespace pickc::windows::x64
         body.push_back(new CmpOperation(getSize(bin->left->type), Operand(Register::RAX), regs[bin->right]));
       }
       else {
-        body.push_back(new CmpOperation(getSize(bin->left->type), regs[bin->left], regs[bin->right]));
+        Operand left;
+        if(regs[bin->left].type == OperandType::Immediate) {
+          left = createOperand();
+          body.push_back(new MovOperation(getSize(bin->left->type), left, regs[bin->left]));
+        }
+        else {
+          left = regs[bin->left];
+        }
+        body.push_back(new CmpOperation(getSize(bin->left->type), left, regs[bin->right]));
       }
     };
     for(size_t i = 0, l = routine->fn->insts.size(); i < l; ++i) {
@@ -173,6 +182,145 @@ namespace pickc::windows::x64
           }
         }
       }
+      else if(instanceof<bundler::MulInstruction>(inst)) {
+        auto mul = dynCast<bundler::MulInstruction>(inst);
+        assert(regs.find(mul->left) != regs.end());
+        assert(regs.find(mul->right) != regs.end());
+        if(regs[mul->left].type == OperandType::Immediate && regs[mul->right].type == OperandType::Immediate) {
+          int64_t imm;
+          if(mul->dist->type->type.isSignedInt()) {
+            imm = static_cast<int64_t>(regs[mul->left].imm) * static_cast<int64_t>(regs[mul->right].imm);
+          }
+          else {
+            imm = static_cast<int64_t>(static_cast<uint64_t>(regs[mul->left].imm) * static_cast<uint64_t>(regs[mul->right].imm));
+          }
+          if(keyExists(regs, mul->dist)) {
+            body.push_back(new MovOperation(getSize(mul->dist->type), regs[mul->dist], Operand(imm)));
+          }
+          else {
+            regs[mul->dist] = Operand(imm);
+          }
+        }
+        else {
+          if(!keyExists(regs, mul->dist)) {
+            regs[mul->dist] = createOperand();
+          }
+          body.push_back(new MovOperation(getSize(mul->dist->type), Operand(Register::RAX), regs[mul->left]));
+          Operand right;
+          if(regs[mul->right].type == OperandType::Immediate) {
+            body.push_back(new MovOperation(getSize(mul->dist->type), Operand(Register::RDX), regs[mul->right]));
+            right = Operand(Register::RDX);
+          }
+          else {
+            right = regs[mul->right];
+          }
+          if(mul->dist->type->type.isSignedInt()) {
+            body.push_back(new IMulOperation(getSize(mul->dist->type), right));
+          }
+          else {
+            body.push_back(new MulOperation(getSize(mul->dist->type), right));
+          }
+          body.push_back(new MovOperation(getSize(mul->dist->type), regs[mul->dist], Operand(Register::RAX)));
+        }
+      }
+      else if(instanceof<bundler::DivInstruction>(inst)) {
+        auto div = dynCast<bundler::DivInstruction>(inst);
+        assert(regs.find(div->left) != regs.end());
+        assert(regs.find(div->right) != regs.end());
+        if(regs[div->left].type == OperandType::Immediate && regs[div->right].type == OperandType::Immediate) {
+          int64_t imm;
+          if(div->dist->type->type.isSignedInt()) {
+            imm = static_cast<int64_t>(regs[div->left].imm) / static_cast<int64_t>(regs[div->right].imm);
+          }
+          else {
+            imm = static_cast<int64_t>(static_cast<uint64_t>(regs[div->left].imm) / static_cast<uint64_t>(regs[div->right].imm));
+          }
+          if(keyExists(regs, div->dist)) {
+            body.push_back(new MovOperation(getSize(div->dist->type), regs[div->dist], Operand(imm)));
+          }
+          else {
+            regs[div->dist] = Operand(imm);
+          }
+        }
+        else {
+          if(!keyExists(regs, div->dist)) {
+            regs[div->dist] = createOperand();
+          }
+          body.push_back(new MovOperation(getSize(div->dist->type), Operand(Register::RAX), regs[div->left]));
+          Operand right;
+          if(regs[div->right].type == OperandType::Immediate) {
+            right = createOperand();
+            body.push_back(new MovOperation(getSize(div->dist->type), right, regs[div->right]));
+          }
+          else {
+            right = regs[div->right];
+          }
+          if(div->dist->type->type.isSignedInt()) {
+            switch(getSize(div->dist->type)) {
+              case OperationSize::Byte: break;
+              case OperationSize::Word: body.push_back(new CWDOperation()); break;
+              case OperationSize::DWord: body.push_back(new CDQOperation()); break;
+              case OperationSize::QWord: body.push_back(new CQOOperation()); break;
+              default: assert(false);
+            }
+            body.push_back(new IDivOperation(getSize(div->dist->type), right));
+          }
+          else {
+            body.push_back(new XorOperation(OperationSize::QWord, Operand(Register::RDX), Operand(Register::RDX)));
+            body.push_back(new DivOperation(getSize(div->dist->type), right));
+          }
+          body.push_back(new MovOperation(getSize(div->dist->type), regs[div->dist], Operand(Register::RAX)));
+        }
+      }
+      else if(instanceof<bundler::ModInstruction>(inst)) {
+        auto mod = dynCast<bundler::ModInstruction>(inst);
+        assert(regs.find(mod->left) != regs.end());
+        assert(regs.find(mod->right) != regs.end());
+        if(regs[mod->left].type == OperandType::Immediate && regs[mod->right].type == OperandType::Immediate) {
+          int64_t imm;
+          if(mod->dist->type->type.isSignedInt()) {
+            imm = static_cast<int64_t>(regs[mod->left].imm) % static_cast<int64_t>(regs[mod->right].imm);
+          }
+          else {
+            imm = static_cast<int64_t>(static_cast<uint64_t>(regs[mod->left].imm) % static_cast<uint64_t>(regs[mod->right].imm));
+          }
+          if(keyExists(regs, mod->dist)) {
+            body.push_back(new MovOperation(getSize(mod->dist->type), regs[mod->dist], Operand(imm)));
+          }
+          else {
+            regs[mod->dist] = Operand(imm);
+          }
+        }
+        else {
+          if(!keyExists(regs, mod->dist)) {
+            regs[mod->dist] = createOperand();
+          }
+          body.push_back(new MovOperation(getSize(mod->dist->type), Operand(Register::RAX), regs[mod->left]));
+          Operand right;
+          if(regs[mod->right].type == OperandType::Immediate) {
+            right = createOperand();
+            body.push_back(new MovOperation(getSize(mod->dist->type), right, regs[mod->right]));
+          }
+          else {
+            right = regs[mod->right];
+          }
+          if(mod->dist->type->type.isSignedInt()) {
+            switch(getSize(mod->dist->type)) {
+              case OperationSize::Byte: break;
+              case OperationSize::Word: body.push_back(new CWDOperation()); break;
+              case OperationSize::DWord: body.push_back(new CDQOperation()); break;
+              case OperationSize::QWord: body.push_back(new CQOOperation()); break;
+              default: assert(false);
+            }
+            body.push_back(new IDivOperation(getSize(mod->dist->type), right));
+          }
+          else {
+            body.push_back(new XorOperation(OperationSize::QWord, Operand(Register::RDX), Operand(Register::RDX)));
+            body.push_back(new DivOperation(getSize(mod->dist->type), right));
+          }
+          body.push_back(new MovOperation(getSize(mod->dist->type), regs[mod->dist], Operand(Register::RDX)));
+        }
+      }
       else if(instanceof<bundler::EqInstruction>(inst)) {
         cmpOp(Cond::EQ, dynCast<bundler::BinaryInstruction>(inst));
       }
@@ -191,6 +339,89 @@ namespace pickc::windows::x64
       else if(instanceof<bundler::LeInstruction>(inst)) {
         cmpOp(Cond::LE, dynCast<bundler::BinaryInstruction>(inst));
       }
+      else if(instanceof<bundler::IncInstruction>(inst)) {
+        auto inc = dynCast<bundler::IncInstruction>(inst);
+        assert(regs.find(inc->src) != regs.end());
+        if(regs[inc->src].type == OperandType::Immediate) {
+          if(keyExists(regs, inc->dist)) {
+            body.push_back(new MovOperation(getSize(inc->dist->type), regs[inc->dist], Operand(regs[inc->src].imm + 1)));
+          }
+          else {
+            regs[inc->dist] = Operand(regs[inc->src].imm + 1);
+          }
+        }
+        else {
+          if(!keyExists(regs, inc->dist)) {
+            regs[inc->dist] = createOperand();
+          }
+          if(regs[inc->dist].type == OperandType::Memory && regs[inc->src].type == OperandType::Memory) {
+            body.push_back(new MovOperation(getSize(inc->dist->type), Operand(Register::RAX), regs[inc->src]));
+            body.push_back(new AddOperation(getSize(inc->dist->type), Operand(Register::RAX), Operand(1)));
+            body.push_back(new MovOperation(getSize(inc->dist->type), regs[inc->dist], Operand(Register::RAX)));
+          }
+          else {
+            body.push_back(new MovOperation(getSize(inc->dist->type), regs[inc->dist], regs[inc->src]));
+            body.push_back(new AddOperation(getSize(inc->dist->type), regs[inc->dist], Operand(1)));
+          }
+        }
+      }
+      else if(instanceof<bundler::DecInstruction>(inst)) {
+        auto dec = dynCast<bundler::DecInstruction>(inst);
+        assert(regs.find(dec->src) != regs.end());
+        if(regs[dec->src].type == OperandType::Immediate) {
+          if(keyExists(regs, dec->dist)) {
+            body.push_back(new MovOperation(getSize(dec->dist->type), regs[dec->dist], Operand(regs[dec->src].imm - 1)));
+          }
+          else {
+            regs[dec->dist] = Operand(regs[dec->src].imm - 1);
+          }
+        }
+        else {
+          if(!keyExists(regs, dec->dist)) {
+            regs[dec->dist] = createOperand();
+          }
+          if(regs[dec->dist].type == OperandType::Memory && regs[dec->src].type == OperandType::Memory) {
+            body.push_back(new MovOperation(getSize(dec->dist->type), Operand(Register::RAX), regs[dec->src]));
+            body.push_back(new SubOperation(getSize(dec->dist->type), Operand(Register::RAX), Operand(1)));
+            body.push_back(new MovOperation(getSize(dec->dist->type), regs[dec->dist], Operand(Register::RAX)));
+          }
+          else {
+            body.push_back(new MovOperation(getSize(dec->dist->type), regs[dec->dist], regs[dec->src]));
+            body.push_back(new SubOperation(getSize(dec->dist->type), regs[dec->dist], Operand(1)));
+          }
+        }
+      }
+      else if(instanceof<bundler::PosInstruction>(inst)) {
+        auto pos = dynCast<bundler::PosInstruction>(inst);
+        assert(regs.find(pos->src) != regs.end());
+        regs[pos->dist] = regs[pos->src];
+      }
+      else if(instanceof<bundler::NegInstruction>(inst)) {
+        auto neg = dynCast<bundler::NegInstruction>(inst);
+        assert(regs.find(neg->src) != regs.end());
+        if(regs[neg->src].type == OperandType::Immediate) {
+          if(keyExists(regs, neg->dist)) {
+            body.push_back(new MovOperation(getSize(neg->dist->type), regs[neg->dist], Operand(-regs[neg->src].imm)));
+          }
+          else {
+            regs[neg->dist] = Operand(-regs[neg->src].imm);
+          }
+        }
+        else {
+          if(!keyExists(regs, neg->dist)) {
+            regs[neg->dist] = createOperand();
+          }
+          if(regs[neg->dist].type == OperandType::Memory && regs[neg->src].type == OperandType::Memory) {
+            body.push_back(new MovOperation(getSize(neg->dist->type), Operand(Register::RAX), regs[neg->src]));
+            body.push_back(new NegOperation(getSize(neg->dist->type), Operand(Register::RAX)));
+            body.push_back(new MovOperation(getSize(neg->dist->type), regs[neg->dist], Operand(Register::RAX)));
+          }
+          else {
+            body.push_back(new MovOperation(getSize(neg->dist->type), regs[neg->dist], regs[neg->src]));
+            body.push_back(new NegOperation(getSize(neg->dist->type), regs[neg->dist]));
+          }
+        }
+      }
       else if(instanceof<bundler::ImmInstruction>(inst)) {
         auto imm = dynCast<bundler::ImmInstruction>(inst);
         if(keyExists(regs, imm->dist)) {
@@ -206,13 +437,18 @@ namespace pickc::windows::x64
       }
       else if(instanceof<bundler::RetInstruction>(inst)) {
         auto ret = dynCast<bundler::RetInstruction>(inst);
-        assert(regs.find(ret->value) != regs.end());
+        assert(ret->value == nullptr || keyExists(regs, ret->value));
         if(curCmpReg == ret->value) {
           // TODO
           assert(false);
         }
         else {
-          body.push_back(new MovOperation(getSize(ret->value->type), Operand(Register::RAX), regs[ret->value]));
+          if(ret->value == nullptr || ret->value->type->type.isVoid()) {
+            body.push_back(new XorOperation(OperationSize::QWord, Operand(Register::RAX), Operand(Register::RAX)));
+          }
+          else {
+            body.push_back(new MovOperation(getSize(ret->value->type), Operand(Register::RAX), regs[ret->value]));
+          }
         }
         insertEpilogue.insert(body.size());
       }
@@ -226,17 +462,16 @@ namespace pickc::windows::x64
         }
       }
       else if(instanceof<bundler::LoadArgInstruction>(inst)) {
-        // 引数は関数の実行中に移動する可能性があるのでLoadFnとは異なり、値をコピーする。
         auto loadArg = dynCast<bundler::LoadArgInstruction>(inst);
         if(!keyExists(regs, loadArg->dist)) {
-          regs[loadArg->dist] = createOperand();
+          regs[loadArg->dist] = args[loadArg->indexOfArg];
         }
-        if(regs[loadArg->dist].type == OperandType::Memory && args[loadArg->indexOfArg].type == OperandType::Memory) {
-          body.push_back(new MovOperation(getSize(loadArg->dist->type), Operand(Register::RAX), args[loadArg->indexOfArg]));
-          body.push_back(new MovOperation(getSize(loadArg->dist->type), regs[loadArg->dist], Operand(Register::RAX)));
+        else if(regs[loadArg->dist].type == OperandType::Register) {
+          body.push_back(new MovOperation(getSize(loadArg->dist->type), regs[loadArg->dist], args[loadArg->indexOfArg]));
         }
         else {
-          body.push_back(new MovOperation(getSize(loadArg->dist->type), regs[loadArg->dist], args[loadArg->indexOfArg]));
+          body.push_back(new MovOperation(getSize(loadArg->dist->type), Operand(Register::RAX), args[loadArg->indexOfArg]));
+          body.push_back(new MovOperation(getSize(loadArg->dist->type), regs[loadArg->dist], Operand(Register::RAX)));
         }
       }
       else if(instanceof<bundler::LoadSymbolInstruction>(inst)) {
@@ -263,6 +498,85 @@ namespace pickc::windows::x64
           }
         }
       }
+      else if(instanceof<bundler::LoadStringInstruction>(inst)) {
+        auto loadStr = dynCast<bundler::LoadStringInstruction>(inst);
+        x64->texts[loadStr->text->text] = 0;
+        if(keyExists(regs, loadStr->dist)) {
+          body.push_back(new MovOperation(getSize(loadStr->dist->type), regs[loadStr->dist], Operand(Relocation(loadStr->text))));
+        }
+        else {
+          regs[loadStr->dist] = Operand(Relocation(loadStr->text));
+        }
+      }
+      else if(instanceof<bundler::LoadElemInstruction>(inst)) {
+        auto loadElem = dynCast<bundler::LoadElemInstruction>(inst);
+        assert(keyExists(regs, loadElem->array));
+        assert(keyExists(regs, loadElem->index));
+        if(!keyExists(regs, loadElem->dist)) {
+          regs[loadElem->dist] = createOperand();
+        }
+        Register base;
+        if(regs[loadElem->array].type == OperandType::Register) {
+          base = regs[loadElem->array].reg;
+        }
+        else {
+          base = Register::RAX;
+          body.push_back(new MovOperation(getSize(loadElem->array->type), Operand(base), regs[loadElem->array]));
+        }
+        
+        if(regs[loadElem->dist].type == OperandType::Register) {
+          if(regs[loadElem->index].type == OperandType::Register) {
+            body.push_back(new LeaOperation(OperationSize::QWord, regs[loadElem->dist].reg, Memory(base, regs[loadElem->index].reg, 0, 0, 8, false)));
+          }
+          else if(regs[loadElem->index].type == OperandType::Memory || regs[loadElem->index].type == OperandType::Relocation) {
+            body.push_back(new MovOperation(getSize(loadElem->index->type), Operand(Register::RDX), regs[loadElem->index]));
+            body.push_back(new LeaOperation(OperationSize::QWord, regs[loadElem->dist].reg, Memory(base, Register::RDX, 0, 0, 8, false)));
+          }
+          else if(regs[loadElem->index].type == OperandType::Immediate) {
+            body.push_back(new LeaOperation(OperationSize::QWord, regs[loadElem->dist].reg, Memory(base, regs[loadElem->index].imm, 8, false)));
+          }
+          else {
+            assert(false);
+          }
+        }
+        else {
+          // dist == Memoryの場合は一度RAXに値を保持しておく。
+          if(regs[loadElem->index].type == OperandType::Register) {
+            body.push_back(new LeaOperation(OperationSize::QWord, Register::RAX, Memory(base, regs[loadElem->index].reg, 0, 0, 8, false)));
+          }
+          else if(regs[loadElem->index].type == OperandType::Memory || regs[loadElem->index].type == OperandType::Relocation) {
+            body.push_back(new MovOperation(getSize(loadElem->index->type), Operand(Register::RDX), regs[loadElem->index]));
+            body.push_back(new LeaOperation(OperationSize::QWord, Register::RAX, Memory(base, Register::RDX, 0, 0, 8, false)));
+          }
+          else if(regs[loadElem->index].type == OperandType::Immediate) {
+            body.push_back(new LeaOperation(OperationSize::QWord, Register::RAX, Memory(base, regs[loadElem->index].imm, 8, false)));
+          }
+          else {
+            assert(false);
+          }
+          body.push_back(new MovOperation(OperationSize::QWord, regs[loadElem->dist], Operand(Register::RAX)));
+        }
+      }
+      else if(instanceof<bundler::AllocInstruction>(inst)) {
+        auto alloc = dynCast<bundler::AllocInstruction>(inst);
+        assert(keyExists(regs, alloc->dist));
+        assert(keyExists(regs, alloc->src));
+        Operand dist;
+        if(regs[alloc->dist].type == OperandType::Register) {
+          dist = Operand(Memory(regs[alloc->dist].reg, 8, false));
+        }
+        else {
+          body.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RAX), regs[alloc->dist]));
+          dist = Operand(Memory(Register::RAX, 8, false));
+        }
+        if(regs[alloc->src].type == OperandType::Register) {
+          body.push_back(new MovOperation(getSize(alloc->dist->type), dist, regs[alloc->src]));
+        }
+        else {
+          body.push_back(new MovOperation(getSize(alloc->src->type), Operand(Register::RDX), regs[alloc->src]));
+          body.push_back(new MovOperation(getSize(alloc->dist->type), dist, Operand(Register::RDX)));
+        }
+      }
       else if(instanceof<bundler::CallInstruction>(inst)) {
         auto call = dynCast<bundler::CallInstruction>(inst);
         assert(regs.find(call->fn) != regs.end());
@@ -272,11 +586,9 @@ namespace pickc::windows::x64
         }
         #endif // NDEBUG
         saveRegs();
-        auto shadowStore = std::min(call->args.size(), 4ull) * 8;
-        if(shadowStore) {
-          body.push_back(new SubOperation(OperationSize::QWord, Operand(Register::RSP), Operand(shadowStore)));
-        }
-        for(size_t arg = 0, argL = call->args.size(); arg < argL; ++arg) {
+        
+        if(call->args.size() % 2 != 0) body.push_back(new PushOperation(Operand(0)));
+        for(int arg = call->args.size() - 1; arg >= 0; --arg) {
           if(arg < 4) {
             body.push_back(new MovOperation(OperationSize::QWord, Operand(*(argRegs.begin() + arg)), regs[call->args[arg]]));
           }
@@ -284,10 +596,16 @@ namespace pickc::windows::x64
             body.push_back(new PushOperation(regs[call->args[arg]]));
           }
         }
+        auto shadowStore = std::min(call->args.size(), 4ull) * 8;
+        if(shadowStore) {
+          body.push_back(new SubOperation(OperationSize::QWord, Operand(Register::RSP), Operand(shadowStore)));
+        }
         body.push_back(new CallOperation(routine, regs[call->fn]));
         // 引数の巻き戻し
         if(!call->args.empty()) {
-          body.push_back(new AddOperation(OperationSize::QWord, Operand(Register::RSP), Operand(call->args.size() * 8)));
+          auto rewind = call->args.size() * 8;
+          if(call->args.size() % 2 != 0) rewind += 8;
+          body.push_back(new AddOperation(OperationSize::QWord, Operand(Register::RSP), Operand(rewind)));
         }
         // 戻り値の取得
         if(call->dist) {
@@ -333,7 +651,7 @@ namespace pickc::windows::x64
     std::vector<Operation*> saveNonvolatileRegs;
 
     for(auto reg : nonvolatileRegs) {
-      if(regInfo[reg] != RegisterInfo::Argument) {
+      if(regInfo[reg] != RegisterInfo::Unused) {
         routine->baseDiff -= 8;
         saveNonvolatileRegs.push_back(new MovOperation(OperationSize::QWord, Operand(Memory(Register::RBP, routine->baseDiff, 8, false)), Operand(reg)));
         epilogue.push_back(new MovOperation(OperationSize::QWord, Operand(reg), Operand(Memory(Register::RBP, routine->baseDiff, 8, false))));
@@ -411,15 +729,6 @@ namespace pickc::windows::x64
   void RoutineCompiler::saveRegs()
   {
     freeRegs();
-    // 呼び出し元ルーチン自身の引数を保存
-    for(size_t i = 0, l = std::min(args.size(), 4ull); i < l; ++i) {
-      if(args[i].type == OperandType::Register && regInfo[args[i].reg] == RegisterInfo::Argument) {
-        auto reg = args[i].reg;
-        regInfo[reg] = RegisterInfo::Used;
-        args[i] = Operand(Memory(Register::RBP, (l - i) * 8, false));
-        body.push_back(new MovOperation(OperationSize::QWord, args[i], Operand(reg)));
-      }
-    }
     for(auto reg : volatileRegs) {
       if(regInfo[reg] == RegisterInfo::InUse) {
         auto mem = Operand(allocStack(8));
@@ -473,6 +782,7 @@ namespace pickc::windows::x64
       case Types::I8:
       case Types::U8:
       case Types::Bool:
+      case Types::Char:
         return OperationSize::Byte;
       case Types::I16:
       case Types::U16:
@@ -484,6 +794,7 @@ namespace pickc::windows::x64
       case Types::U64:
         return OperationSize::QWord;
       case Types::Ptr:
+      case Types::Null:
         return OperationSize::QWord;
       case Types::Function:
         return OperationSize::QWord;

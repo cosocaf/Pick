@@ -13,7 +13,7 @@ namespace pickc::pcir
     (*flow)->type = FlowType::Normal;
 
     auto child = new FlowNode();
-    child->type = FlowType::Normal;
+    child->type = FlowType::Undecided;
     child->parentFlow = *flow;
     child->belong = (*flow)->belong;
     child->belong->flows.push_back(child);
@@ -23,7 +23,10 @@ namespace pickc::pcir
     std::vector<std::string> errors;
     for(auto node : block->nodes) {
       if(instanceof<ExpressionNode>(node)) {
-        if(auto res = exprAnalyze(dynCast<ExpressionNode>(node), &child)) child->result = res.get();
+        if(auto res = exprAnalyze(dynCast<ExpressionNode>(node), &child)) {
+          child->result = res.get();
+          child->type = FlowType::Undecided;
+        }
         else errors += res.err();
       }
       else if(instanceof<ReturnNode>(node)) {
@@ -35,7 +38,6 @@ namespace pickc::pcir
               errors.push_back(createSemanticError(ret, err.get()));
             }
             else {
-              child->type = FlowType::EndPoint;
               child->retReg = value.get();
             }
           }
@@ -48,18 +50,26 @@ namespace pickc::pcir
             errors.push_back(createSemanticError(ret, err.get()));
           }
           else{
-            child->type = FlowType::EndPoint;
             child->retReg = nullptr;
           }
         }
+        child->type = FlowType::EndPoint;
+        // デッドコードも解析だけはする。
+        auto deadFlow = new FlowNode();
+        deadFlow->type = FlowType::Undecided;
+        deadFlow->parentFlow = child;
+        deadFlow->belong = child->belong;
+        deadFlow->belong->flows.push_back(deadFlow);
+        child = deadFlow;
       }
       else {
         assert(false);
       }
     }
 
-    if(child->type != FlowType::EndPoint) {
+    if(child->type == FlowType::Undecided) {
       auto next = new FlowNode();
+      next->type = FlowType::Undecided;
       next->parentFlow = *flow;
       next->belong = (*flow)->belong;
       next->belong->flows.push_back(next);

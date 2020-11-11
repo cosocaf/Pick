@@ -5,6 +5,7 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <unordered_set>
 
 #include "pickc/module_tree.h"
 #include "pickc/compiler_option.h"
@@ -18,6 +19,7 @@ namespace pickc::pcir
   {
     friend class ModuleAnalyzer;
     ModuleTree* rootTree;
+    std::unordered_set<ModuleTree*> trees;
     std::set<std::string> texts;
     std::set<Type> types;
     std::map<std::string, Module*> modules;

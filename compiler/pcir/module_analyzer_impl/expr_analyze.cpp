@@ -2,6 +2,7 @@
 
 #include "utils/instanceof.h"
 #include "utils/vector_utils.h"
+#include "utils/dyn_cast.h"
 
 namespace pickc::pcir
 {
@@ -9,28 +10,31 @@ namespace pickc::pcir
   {
     using namespace parser;
     if(instanceof<BlockNode>(expr)) {
-      return blockAnalyze(dynamic_cast<const BlockNode*>(expr), flow);
+      return blockAnalyze(dynCast<BlockNode>(expr), flow);
     }
     else if(instanceof<VariableNode>(expr)) {
-      return varAnalyze(dynamic_cast<const VariableNode*>(expr), flow);
+      return varAnalyze(dynCast<VariableNode>(expr), flow);
     }
     else if(instanceof<LiteralNode>(expr)) {
-      return literalAnalyze(dynamic_cast<const LiteralNode*>(expr), flow);
+      return literalAnalyze(dynCast<LiteralNode>(expr), flow);
     }
     else if(instanceof<UnaryNode>(expr)) {
-      return unaryAnalyze(dynamic_cast<const UnaryNode*>(expr), flow);
+      return unaryAnalyze(dynCast<UnaryNode>(expr), flow);
     }
     else if(instanceof<BinaryNode>(expr)) {
-      return binaryAnalyze(dynamic_cast<const BinaryNode*>(expr), flow);
+      return binaryAnalyze(dynCast<BinaryNode>(expr), flow);
     }
     else if(instanceof<VariableDefineNode>(expr)) {
-      return varDefAnalyze(dynamic_cast<const VariableDefineNode*>(expr), flow);
+      return varDefAnalyze(dynCast<VariableDefineNode>(expr), flow);
     }
     else if(instanceof<FunctionDefineNode>(expr)) {
-      return fnDefAnalyze(dynamic_cast<const FunctionDefineNode*>(expr), flow);
+      return fnDefAnalyze(dynCast<FunctionDefineNode>(expr), flow);
     }
     else if(instanceof<IfNode>(expr)) {
-      return ifAnalyze(dynamic_cast<const IfNode*>(expr), flow);
+      return ifAnalyze(dynCast<IfNode>(expr), flow);
+    }
+    else if(instanceof<WhileNode>(expr)) {
+      return whileAnalyze(dynCast<WhileNode>(expr), flow);
     }
     else {
       assert(false);

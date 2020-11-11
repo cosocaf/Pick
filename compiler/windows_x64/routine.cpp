@@ -87,6 +87,7 @@ namespace pickc::windows::x64
   }
   Memory::Memory(Register base, size_t numBytes, bool needAddressFix) : base(some(base)), scale(none), index(0), disp(0), numBytes(numBytes), needAddressFix(needAddressFix) {}
   Memory::Memory(Register base, int32_t disp, size_t numBytes, bool needAddressFix) : base(some(base)), scale(none), index(0), disp(disp), numBytes(numBytes), needAddressFix(needAddressFix) {}
+  Memory::Memory(Register base, Register scale, uint8_t index, int32_t disp, size_t numBytes, bool needAdressFix) : base(some(base)), scale(some(scale)), index(index), disp(disp), numBytes(numBytes), needAddressFix(needAddressFix) {}
   Operand::Operand() : type(OperandType::_NONE) {}
   Operand::Operand(Register reg) : type(OperandType::Register), reg(reg) {}
   Operand::Operand(int64_t imm) : type(OperandType::Immediate), imm(imm) {}
@@ -153,7 +154,9 @@ namespace pickc::windows::x64
   }
   Relocation::Relocation(pcir::SymbolSection* symbol) : type(RelocationType::Symbol), symbol(symbol) {}
   Relocation::Relocation(pcir::FunctionSection* fn) : type(RelocationType::Function), fn(fn) {}
+  Relocation::Relocation(pcir::TextSection* text) : type(RelocationType::Text), text(text) {}
   Relocation::Relocation(size_t jmpTo) : type(RelocationType::JmpTo), jmpTo(jmpTo) {}
+  Relocation::Relocation(const std::string& ext) : type(RelocationType::Extern), ext(ext) {}
   Relocation::Relocation(const Relocation& reloc) : type(reloc.type)
   {
     switch(type) {
@@ -165,8 +168,14 @@ namespace pickc::windows::x64
       case RelocationType::Function:
         fn = reloc.fn;
         break;
+      case RelocationType::Text:
+        text = reloc.text;
+        break;
       case RelocationType::JmpTo:
         jmpTo = reloc.jmpTo;
+        break;
+      case RelocationType::Extern:
+        new (&ext) std::string(reloc.ext);
         break;
       default:
         assert(false);
@@ -174,6 +183,7 @@ namespace pickc::windows::x64
   }
   Relocation& Relocation::operator=(const Relocation& reloc)
   {
+    clear();
     type = reloc.type;
     switch(type) {
       case RelocationType::_NONE:
@@ -184,14 +194,44 @@ namespace pickc::windows::x64
       case RelocationType::Function:
         fn = reloc.fn;
         break;
+      case RelocationType::Text:
+        text = reloc.text;
+        break;
       case RelocationType::JmpTo:
         jmpTo = reloc.jmpTo;
+        break;
+      case RelocationType::Extern:
+        new (&ext) std::string(reloc.ext);
         break;
       default:
         assert(false);
     }
     return *this;
   }
-  Relocation::~Relocation() {}
+  Relocation::~Relocation()
+  {
+    clear();
+  }
+  void Relocation::clear()
+  {
+    switch(type) {
+      case RelocationType::_NONE:
+        break;
+      case RelocationType::Symbol:
+        break;
+      case RelocationType::Function:
+        break;
+      case RelocationType::Text:
+        break;
+      case RelocationType::JmpTo:
+        break;
+      case RelocationType::Extern:
+        ext.~basic_string();
+        break;
+      default:
+        assert(false);
+    }
+    type = RelocationType::_NONE;
+  }
   RelocationInfo::RelocationInfo(Routine* routine, const Relocation& reloc, Operation* op, size_t index, OperationSize size, RelocationPosition pos) : routine(routine), reloc(reloc), op(op), index(index), size(size), pos(pos) {}
 }

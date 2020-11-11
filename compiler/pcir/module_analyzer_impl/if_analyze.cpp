@@ -27,14 +27,16 @@ namespace pickc::pcir
     if(auto cond = exprAnalyze(ifNode->comp, &ifFlow)) ifFlow->cond = cond.get();
     else errors += cond.err();
 
+    auto begin = (*flow)->currentVars();
+
     auto next = new FlowNode();
-    next->type = FlowType::EndPoint;
+    next->type = FlowType::Undecided;
     next->parentFlow = *flow;
     next->belong = (*flow)->belong;
     next->belong->flows.push_back(next);
     
     auto thenFlow = new FlowNode();
-    thenFlow->type = FlowType::EndPoint;
+    thenFlow->type = FlowType::Undecided;
     thenFlow->parentFlow = *flow;
     thenFlow->belong = (*flow)->belong;
     thenFlow->belong->flows.push_back(thenFlow);
@@ -49,21 +51,25 @@ namespace pickc::pcir
           errors.push_back(createSemanticError(ifNode->thenExpr, "既に移動された変数を返しました。"));
         }
       }
-      thenFlow->type = FlowType::Normal;
-      thenFlow->nextFlow = next;
+      if(thenFlow->type == FlowType::Undecided) {
+        thenFlow->type = FlowType::Normal;
+        thenFlow->nextFlow = next;
+      }
     }
     else errors += thenRes.err();
 
     if(ifNode->elseExpr) {
       auto elseFlow = new FlowNode();
-      elseFlow->type = FlowType::EndPoint;
+      elseFlow->type = FlowType::Undecided;
       elseFlow->parentFlow = *flow;
       elseFlow->belong = (*flow)->belong;
       elseFlow->belong->flows.push_back(elseFlow);
       ifFlow->elseFlow = elseFlow;
       if(auto elseRes = exprAnalyze(ifNode->elseExpr, &elseFlow)) {
-        elseFlow->type = FlowType::Normal;
-        elseFlow->nextFlow = next;
+        if(elseFlow->type == FlowType::Undecided) {
+          elseFlow->type = FlowType::Normal;
+          elseFlow->nextFlow = next;
+        }
 
         if(elseRes.get() && elseRes.get()->curVar != nullptr) {
           if(elseRes.get()->curVar->status == VariableStatus::Uninited) {
@@ -85,6 +91,25 @@ namespace pickc::pcir
         }
       }
       else errors += elseRes.err();
+    }
+    else {
+      ifFlow->elseFlow = next;
+    }
+
+    auto end = next->currentVars();
+
+    for(auto& var : begin) {
+      if(end[var.first] != var.second) {
+        auto phi = new PhiInstruction();
+        phi->dist = new Register();
+        phi->r1 = var.second;
+        phi->r2 = end[var.first];
+        phi->dist->type = var.second->type;
+        phi->dist->curVar = var.second->curVar;
+        var.second->curVar->reg = phi->dist;
+        next->insts.push_back(phi);
+        next->addReg(phi->dist);
+      }
     }
 
     *flow = next;

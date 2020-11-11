@@ -8,6 +8,11 @@
 #include "parser/ast_node.h"
 #include "pcir_code.h"
 
+namespace pickc
+{
+  struct ModuleTree;
+}
+
 namespace pickc::pcir
 {
   enum struct Scope
@@ -20,11 +25,6 @@ namespace pickc::pcir
     Immutable,
     Mutable,
   };
-  enum struct ValueType
-  {
-    LeftValue,
-    RightValue,
-  };
   enum struct Types
   {
     _UNDEFINED,
@@ -34,6 +34,8 @@ namespace pickc::pcir
     Integer,
     // FloatLiteralの型。状況によってF32, F64のいずれかに変換される。
     Float,
+    // NullLiteralの型。状況によってptr<T>のTが異なる型に変換される。
+    Null,
     I8,
     I16,
     I32,
@@ -110,6 +112,7 @@ namespace pickc::pcir
     bool isArray() const;
     bool isVoid() const;
     bool isBool() const;
+    bool isNull() const;
     bool isChar() const;
     bool isPtr() const;
     bool isFn() const;
@@ -132,10 +135,16 @@ namespace pickc::pcir
     GlobalVariable,
   };
   struct Variable;
+  enum struct ValueType
+  {
+    LValue,
+    RValue
+  };
   struct Register
   {
     Type type;
     Variable* curVar;
+    ValueType vType = ValueType::LValue;
   };
   // struct RegisterX
   // {
@@ -198,6 +207,9 @@ namespace pickc::pcir
     uint64_t u64;
     float f32;
     double f64;
+    bool b;
+    std::nullptr_t null;
+    char c;
   };
   struct ImmMove : public Instruction
   {
@@ -226,6 +238,22 @@ namespace pickc::pcir
     Register* reg;
     std::string name;
   };
+  struct LoadStringInstruction : public Instruction
+  {
+    Register* reg;
+    std::string value;
+  };
+  struct LoadElemInstruction : public Instruction
+  {
+    Register* dist;
+    Register* array;
+    Register* index;
+  };
+  struct AllocInstruction : public Instruction
+  {
+    Register* dist;
+    Register* src;
+  };
 
   struct MovInstruction : public Instruction
   {
@@ -237,6 +265,12 @@ namespace pickc::pcir
     Register* dist;
     Register* r1;
     Register* r2;
+  };
+
+  enum struct FunctionType
+  {
+    Function,
+    Extern,
   };
 
   struct Function;
@@ -256,6 +290,7 @@ namespace pickc::pcir
   };
   enum struct FlowType
   {
+    Undecided,
     Normal,
     ConditionalBranch,
     EndPoint,
@@ -274,11 +309,14 @@ namespace pickc::pcir
     Register* retReg;
     Register* result;
     Variable* findVar(const std::string& name) const;
+    std::unordered_map<Variable*, Register*> currentVars() const;
     Option<std::string> retNotice(const Type& t) const;
     void addReg(Register* reg);
   };
   struct Function
   {
+    FunctionType fType;
+    std::string externName;
     struct DefaultArgument
     {
       FlowNode* flow;
@@ -311,6 +349,7 @@ namespace pickc::pcir
   {
     std::map<std::string, Symbol*> symbols;
     std::vector<Function*> functions;
+    std::unordered_set<ModuleTree*> importModules;
   };
 }
 

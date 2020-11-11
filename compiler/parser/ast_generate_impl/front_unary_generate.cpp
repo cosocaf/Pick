@@ -33,6 +33,7 @@ namespace pickc::parser
           assert(false);
       }
       node->tokens = std::vector(begin, currentTokenIter() + 1);
+      return ok(node);
     }
     return backUnaryGenerate();
   }

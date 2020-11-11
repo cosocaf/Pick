@@ -191,7 +191,9 @@ namespace pickc::windows::x64
     _NONE,
     Symbol,
     Function,
+    Text,
     JmpTo,
+    Extern,
   };
   struct Relocation
   {
@@ -199,14 +201,20 @@ namespace pickc::windows::x64
     union {
       pcir::SymbolSection* symbol;
       pcir::FunctionSection* fn;
+      pcir::TextSection* text;
       size_t jmpTo;
+      std::string ext;
     };
     explicit Relocation(pcir::SymbolSection* symbol);
     explicit Relocation(pcir::FunctionSection* fn);
+    explicit Relocation(pcir::TextSection* text);
     explicit Relocation(size_t jmpTo);
+    explicit Relocation(const std::string& ext);
     Relocation(const Relocation& reloc);
     Relocation& operator=(const Relocation& reloc);
     ~Relocation();
+  private:
+    void clear();
   };
 
   enum struct OperandType
@@ -230,6 +238,7 @@ namespace pickc::windows::x64
     bool needAddressFix;
     Memory(Register base, size_t numBytes, bool needAddressFix);
     Memory(Register base, int32_t disp, size_t numBytes, bool needAddressFix);
+    Memory(Register base, Register scale, uint8_t index, int32_t disp, size_t numBytes, bool needAdressFix);
   };
   struct Operand
   {
@@ -274,7 +283,12 @@ namespace pickc::windows::x64
     using BinaryOperation::BinaryOperation;
     virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
   };
-
+  class XorOperation : public BinaryOperation
+  {
+  public:
+    using BinaryOperation::BinaryOperation;
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
   class CmpOperation : public BinaryOperation
   {
   public:
@@ -282,10 +296,87 @@ namespace pickc::windows::x64
     virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
   };
 
+  /**
+   * Mul, IMul, Div, IDivは左辺RAX固定
+   * dist = RAX op R/M を行う。
+   * また、IMulに限って最大3つのオペランドを取る形式が存在するが、
+   * 現状は実装を見送る。
+  */
+  class MulDivOperation : public Operation
+  {
+  protected:
+    Operand right;
+    BinaryVec mulDivTemplate(Routine* routine, uint8_t op);
+  public:
+    MulDivOperation(OperationSize size, Operand right);
+  };
+  class MulOperation : public MulDivOperation
+  {
+  public:
+    using MulDivOperation::MulDivOperation;
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+  class IMulOperation : public MulDivOperation
+  {
+  public:
+    using MulDivOperation::MulDivOperation;
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+  class DivOperation : public MulDivOperation
+  {
+  public:
+    using MulDivOperation::MulDivOperation;
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+  class IDivOperation : public MulDivOperation
+  {
+  public:
+    using MulDivOperation::MulDivOperation;
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+
   class MovOperation : public BinaryOperation
   {
   public:
     using BinaryOperation::BinaryOperation;
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+
+  class NegOperation : public Operation
+  {
+    Operand operand;
+  public:
+    NegOperation(OperationSize size, Operand operand);
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+  // ALを符号拡張してAXに設定する。
+  class CWDOperation : public Operation
+  {
+  public:
+    CWDOperation();
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+  // AXを符号拡張してEAXに設定する。
+  class CDQOperation : public Operation
+  {
+  public:
+    CDQOperation();
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+  // EAXを符号拡張してRAXに設定
+  class CQOOperation : public Operation
+  {
+  public:
+    CQOOperation();
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+
+  class LeaOperation : public Operation
+  {
+    Register dist;
+    Memory src;
+  public:
+    LeaOperation(OperationSize size, Register dist, Memory src);
     virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
   };
 
@@ -343,6 +434,13 @@ namespace pickc::windows::x64
   {
   public:
     using JmpOperation::JmpOperation;
+    virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
+  };
+  class ExtJmpOperation : public Operation
+  {
+    std::string ext;
+  public:
+    ExtJmpOperation(const std::string& ext);
     virtual BinaryVec bin(WindowsX64& x64, Routine* routine) override;
   };
 
@@ -420,8 +518,12 @@ namespace pickc::windows::x64
     Routine* invokeMain;
     // シンボルと、それに対応するシンボルが配置されるアドレス。
     std::map<pcir::SymbolSection*, uint64_t> symbols;
+    // テキストと、それに対応する文字列が配置されるアドレス。
+    std::map<std::string, uint64_t> texts;
     // 関数セクションと、ネイティブ関数
     std::map<pcir::FunctionSection*, Routine*> routines;
+    // extern関数の名前対応表
+    std::map<pcir::FunctionSection*, std::string> externs;
     // 型テーブル
     TypeTable typeTable;
     // 再配置テーブル

@@ -32,6 +32,26 @@ namespace pickc::bundler
   struct GeInstruction : public BinaryInstruction {};
   struct LtInstruction : public BinaryInstruction {};
   struct LeInstruction : public BinaryInstruction {};
+  struct IncInstruction : public Instruction
+  {
+    Register* dist;
+    Register* src;
+  };
+  struct DecInstruction : public Instruction
+  {
+    Register* dist;
+    Register* src;
+  };
+  struct PosInstruction : public Instruction
+  {
+    Register* dist;
+    Register* src;
+  };
+  struct NegInstruction : public Instruction
+  {
+    Register* dist;
+    Register* src;
+  };
   struct LoadFnInstruction : public Instruction
   {
     Register* dist;
@@ -46,6 +66,22 @@ namespace pickc::bundler
   {
     Register* dist;
     pcir::SymbolSection* symbol;
+  };
+  struct LoadStringInstruction : public Instruction
+  {
+    Register* dist;
+    pcir::TextSection* text;
+  };
+  struct LoadElemInstruction : public Instruction
+  {
+    Register* dist;
+    Register* array;
+    Register* index;
+  };
+  struct AllocInstruction : public Instruction
+  {
+    Register* dist;
+    Register* src;
   };
   struct CallInstruction : public Instruction
   {
@@ -81,6 +117,8 @@ namespace pickc::bundler
   struct Function
   {
     pcir::TypeSection* type;
+    uint32_t fnType;
+    pcir::TextSection* externName;
     std::unordered_set<Register*> regs;
     std::unordered_map<Register*, PhiGroup*> phis;
     std::vector<Instruction*> insts;

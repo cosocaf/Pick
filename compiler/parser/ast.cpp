@@ -114,20 +114,26 @@ namespace pickc::parser
           break;
         case TokenKind::ClassKeyword: {
           auto res = clsDefGenerate();
+          assert(false);
           break;
         }
         case TokenKind::TypeKeyword: {
           auto res = alsDefGenerate();
+          assert(false);
           break;
         }
-        case TokenKind::ImportKeyword: {
-          auto res = importGenerate();
+        case TokenKind::ImportKeyword:
+          if(auto impRes = importGenerate()) rootNode.nodes.push_back(impRes.get());
+          else errors += impRes.err();
           break;
-        }
-        case TokenKind::ExternKeyword: {
-          auto res = externGenerate();
+        case TokenKind::ExternKeyword:
+          if(auto extRes = externGenerate()) {
+            auto ext = extRes.get();
+            ext->isPub = isPub;
+            rootNode.nodes.push_back(ext);
+          }
+          else errors += extRes.err();
           break;
-        }
         case TokenKind::Semicolon:
           break;
         default:

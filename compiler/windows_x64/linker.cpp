@@ -3,6 +3,10 @@
 #include <filesystem>
 #include <fstream>
 
+#include "utils/vector_utils.h"
+#include "utils/map_utils.h"
+#include "pcir/pcir_format.h"
+
 namespace pickc::windows::x64
 {
   uint32_t Linker::alignment(uint32_t value, uint32_t alignment)
@@ -119,9 +123,31 @@ namespace pickc::windows::x64
       0x42000040
     }
   {}
-  void Linker::placeSymbols()
+  Result<_, std::vector<std::string>> Linker::link(const CompilerOption& option)
   {
-    
+    std::vector<std::string> errors;
+
+    placeRoutines();
+
+    ntHeader.fileHeader.numSections = 4;
+    ntHeader.optionalHeader.sizeOfHeaders = alignment(sizeof(DOSHeader) + sizeof(stub) + sizeof(NTHeader) + sizeof(SectionHeader) * ntHeader.fileHeader.numSections, ntHeader.optionalHeader.fileAlignment);
+
+    placeTextSection();
+    auto libRes = loadLibs(option);
+    if(!libRes) errors += libRes.err();
+    placeRDataSection();
+    placeDataSection();
+    placeRelocation();
+
+    ntHeader.optionalHeader.baseOfCode = textSection.virtualAddress;
+
+    ntHeader.optionalHeader.sizeOfImage = ntHeader.optionalHeader.addressOfEntryPoint + ntHeader.optionalHeader.sectionAlignment * ntHeader.fileHeader.numSections;
+
+    auto writeRes = write(option);
+    if(!writeRes) errors += writeRes.err();
+
+    if(errors.empty()) return ok();
+    return error(errors);
   }
   void Linker::placeRoutines()
   {
@@ -132,20 +158,12 @@ namespace pickc::windows::x64
         routine.second->codeIndexes[op] = routine.second->nativeCode.size();
         routine.second->nativeCode << op->bin(x64, routine.second);
       }
+      routine.second->codeIndexes[nullptr] = routine.second->nativeCode.size();
       routineAddress += routine.second->nativeCode.size();
     }
   }
-  Option<std::vector<std::string>> Linker::link(const CompilerOption& option)
+  void Linker::placeTextSection()
   {
-    std::vector<std::string> errors;
-
-    placeSymbols();
-    placeRoutines();
-
-    ntHeader.fileHeader.numSections = 4;
-    // if (!x64.runtimeSymbols.empty()) ++ntHeader.fileHeader.numSections;
-    ntHeader.optionalHeader.sizeOfHeaders = alignment(sizeof(DOSHeader) + sizeof(stub) + sizeof(NTHeader) + sizeof(SectionHeader) * ntHeader.fileHeader.numSections, ntHeader.optionalHeader.fileAlignment);
-
     uint64_t address = ntHeader.optionalHeader.imageBase + ntHeader.optionalHeader.addressOfEntryPoint;
     for (auto& routine : x64.routines) {
       routine.second->address = address;
@@ -158,31 +176,39 @@ namespace pickc::windows::x64
     textSection.virtualAddress = ntHeader.optionalHeader.addressOfEntryPoint;
 
     ntHeader.optionalHeader.sizeOfCode = textSection.sizeOfRawData;
+  }
+  void Linker::placeRDataSection()
+  {
+    uint64_t address = ntHeader.optionalHeader.imageBase
+                     + ntHeader.optionalHeader.addressOfEntryPoint
+                     + alignment(ntHeader.optionalHeader.sizeOfCode, ntHeader.optionalHeader.sectionAlignment)
+                     + rdataSectionRawData.size();
 
-    // auto res = resolveRelocations();
-    // if (!res) errors += res.err();
-
-    rdataSectionRawData.resize(0x200);
-
-    const uint64_t rdataBase =
-            ntHeader.optionalHeader.imageBase
-            + ntHeader.optionalHeader.addressOfEntryPoint
-            + alignment(ntHeader.optionalHeader.sizeOfCode, ntHeader.optionalHeader.sectionAlignment);
-
-    address = rdataBase + ntHeader.optionalHeader.dataDirectory[12].size;
-    if (ntHeader.optionalHeader.dataDirectory[12].size != 0) {
-      ntHeader.optionalHeader.dataDirectory[12].virtualAddress = rdataBase - ntHeader.optionalHeader.imageBase;
-      rdataSectionRawData.resize(rdataSectionRawData.size() + ntHeader.optionalHeader.dataDirectory[12].size);
+    for(auto& text : x64.texts) {
+      text.second = address;
+      address += text.first.size() + 1;
+      rdataSectionRawData.reserve(rdataSectionRawData.size() + text.first.size() + 1);
+      for(auto c : text.first) {
+        rdataSectionRawData.push_back(c);
+      }
+      rdataSectionRawData.push_back('\0');
     }
-
+    if(ntHeader.optionalHeader.sizeOfInitData == 0) {
+      rdataSectionRawData.resize(8);
+    }
     ntHeader.optionalHeader.sizeOfInitData = rdataSectionRawData.size();
     rdataSection.misc.virtualSize = ntHeader.optionalHeader.sizeOfInitData;
     rdataSection.sizeOfRawData = alignment(rdataSection.misc.virtualSize, ntHeader.optionalHeader.fileAlignment);
     rdataSection.ptrToRawData = textSection.ptrToRawData + textSection.sizeOfRawData;
     rdataSection.virtualAddress = textSection.virtualAddress + alignment(textSection.sizeOfRawData, ntHeader.optionalHeader.sectionAlignment);
     ntHeader.optionalHeader.sizeOfInitData = rdataSection.sizeOfRawData;
-
-    address = ntHeader.optionalHeader.imageBase + ntHeader.optionalHeader.addressOfEntryPoint + alignment(ntHeader.optionalHeader.sizeOfCode, ntHeader.optionalHeader.sectionAlignment) + alignment(rdataSection.sizeOfRawData, ntHeader.optionalHeader.sectionAlignment);
+  }
+  void Linker::placeDataSection()
+  {
+    uint64_t address = ntHeader.optionalHeader.imageBase
+                     + ntHeader.optionalHeader.addressOfEntryPoint
+                     + alignment(ntHeader.optionalHeader.sizeOfCode, ntHeader.optionalHeader.sectionAlignment)
+                     + alignment(rdataSection.sizeOfRawData, ntHeader.optionalHeader.sectionAlignment);
     for(auto& symbol : x64.symbols) {
       symbol.second = address + ntHeader.optionalHeader.sizeOfUninitData;
       ntHeader.optionalHeader.sizeOfUninitData += x64.typeTable[symbol.first->type].getSize();
@@ -192,7 +218,9 @@ namespace pickc::windows::x64
     dataSection.ptrToRawData = rdataSection.ptrToRawData + rdataSection.sizeOfRawData;
     dataSection.virtualAddress = rdataSection.virtualAddress + alignment(rdataSection.sizeOfRawData, ntHeader.optionalHeader.sectionAlignment);
     ntHeader.optionalHeader.sizeOfUninitData = dataSection.sizeOfRawData;
-
+  }
+  void Linker::placeRelocation()
+  {
     for(auto& reloc : x64.relocs) {
       size_t value;
       auto index = reloc->routine->codeIndexes[reloc->op] + reloc->index;
@@ -202,7 +230,14 @@ namespace pickc::windows::x64
         case RelocationType::Function:
           switch(reloc->pos) {
             case RelocationPosition::Relative: {
-              size_t base = reloc->routine->codeIndexes[*(std::find(reloc->routine->code.begin(), reloc->routine->code.end(), reloc->op) + 1)];
+              size_t base;
+              auto itr = std::find(reloc->routine->code.begin(), reloc->routine->code.end(), reloc->op) + 1;
+              if(itr != reloc->routine->code.end()) {
+                base = reloc->routine->codeIndexes[*(std::find(reloc->routine->code.begin(), reloc->routine->code.end(), reloc->op) + 1)];
+              }
+              else {
+                base = reloc->routine->codeIndexes[nullptr];
+              }
               value = x64.routines[reloc->reloc.fn]->address - (reloc->routine->address + base);
               break;
             }
@@ -220,8 +255,24 @@ namespace pickc::windows::x64
           relocs[rva].base.sizeOfBlock += 2;
           relocs[rva].rva.push_back(0x3000 | ((vaddress) & 0x0FFF));
           break;
-        case RelocationType::JmpTo: {
+        case RelocationType::Text:
+          value = x64.texts[reloc->reloc.text->text];
+          relocs[rva].base.sizeOfBlock += 2;
+          relocs[rva].rva.push_back(0x3000 | ((vaddress) & 0x0FFF));
+          break;
+        case RelocationType::JmpTo:
           value = reloc->routine->codeIndexes[reloc->routine->code[reloc->routine->bundleIndexes[reloc->reloc.jmpTo]]] - (reloc->routine->codeIndexes[reloc->op] + reloc->index + 4);
+          break;
+        case RelocationType::Extern: {
+          size_t base;
+          auto itr = std::find(reloc->routine->code.begin(), reloc->routine->code.end(), reloc->op) + 1;
+          if(itr != reloc->routine->code.end()) {
+            base = reloc->routine->codeIndexes[*(std::find(reloc->routine->code.begin(), reloc->routine->code.end(), reloc->op) + 1)];
+          }
+          else {
+            base = reloc->routine->codeIndexes[nullptr];
+          }
+          value = libSymbols[reloc->reloc.ext].address - (reloc->routine->address + base);
           break;
         }
         default:
@@ -266,28 +317,125 @@ namespace pickc::windows::x64
     relocSection.ptrToRawData = dataSection.ptrToRawData + dataSection.sizeOfRawData;
     relocSection.virtualAddress = dataSection.virtualAddress + alignment(relocSection.sizeOfRawData, ntHeader.optionalHeader.sectionAlignment);
 
-    // if (x64.runtimeSymbols.empty()) {
-    //     relocSection.ptrToRawData = rdataSection.ptrToRawData + rdataSection.sizeOfRawData;
-    //     relocSection.virtualAddress = rdataSection.virtualAddress + alignment(relocSection.sizeOfRawData, ntHeader.optionalHeader.sectionAlignment);
-    // }
-    // else {
     relocSection.ptrToRawData = dataSection.ptrToRawData + dataSection.sizeOfRawData;
     relocSection.virtualAddress = dataSection.virtualAddress + alignment(relocSection.sizeOfRawData, ntHeader.optionalHeader.sectionAlignment);
-    // }
 
     ntHeader.optionalHeader.sizeOfInitData += relocSection.sizeOfRawData;
 
     ntHeader.optionalHeader.dataDirectory[5].size = relocSection.misc.virtualSize;
     ntHeader.optionalHeader.dataDirectory[5].virtualAddress = relocSection.virtualAddress;
+  }
+  Result<_, std::vector<std::string>> Linker::loadLibs(const CompilerOption& option)
+  {
+    std::vector<std::string> errors;
 
-    ntHeader.optionalHeader.baseOfCode = textSection.virtualAddress;
+    for (const auto& lib : option.libraries) {
+      auto res = LibLoader(lib).load();
+      if (!res) errors += res.err();
+      else libSymbols.merge(res.get());
+    }
 
-    ntHeader.optionalHeader.sizeOfImage = ntHeader.optionalHeader.addressOfEntryPoint + ntHeader.optionalHeader.sectionAlignment * ntHeader.fileHeader.numSections;
+    const uint64_t rdataBase = ntHeader.optionalHeader.imageBase
+                             + ntHeader.optionalHeader.addressOfEntryPoint
+                             + alignment(ntHeader.optionalHeader.sizeOfCode, ntHeader.optionalHeader.sectionAlignment);
 
+    std::map<std::string, DLL> dlls;
+    // 使用するDLLを列挙する。
+    for(auto& ext : x64.externs) {
+      if(!keyExists(libSymbols, ext.second)) {
+        errors.push_back("リンクエラー: シンボル " + ext.second + " が見つかりませんでした。");
+      }
+      else {
+        // マーキング
+        dlls[libSymbols[ext.second].header.name].symbols[ext.second] = 0;
+      }
+    }
+    for (auto& dll : dlls) {
+      dll.second.thunkIndex = ntHeader.optionalHeader.dataDirectory[12].size + rdataBase - ntHeader.optionalHeader.imageBase;
+      ntHeader.optionalHeader.dataDirectory[12].size += 8 * (dll.second.symbols.size() + 1);
+    }
+
+    uint64_t address = rdataBase + ntHeader.optionalHeader.dataDirectory[12].size;
+
+    if (ntHeader.optionalHeader.dataDirectory[12].size != 0) {
+      ntHeader.optionalHeader.dataDirectory[12].virtualAddress = rdataBase - ntHeader.optionalHeader.imageBase;
+      rdataSectionRawData.resize(rdataSectionRawData.size() + ntHeader.optionalHeader.dataDirectory[12].size);
+    }
+
+    if (ntHeader.optionalHeader.dataDirectory[12].size != 0) {
+      ntHeader.optionalHeader.dataDirectory[1].virtualAddress = address - ntHeader.optionalHeader.imageBase;
+      auto thunkBase = address + sizeof(ImportDescriptor) * (dlls.size() + 1) - ntHeader.optionalHeader.imageBase;
+      auto iatBase = thunkBase;
+      for (auto& dll : dlls) {
+        dll.second.index = iatBase;
+        iatBase += sizeof(ThunkData) * (dll.second.symbols.size() + 1);
+      }
+      auto symbolIndex = iatBase;
+      for (auto& dll : dlls) {
+        for (auto& symbol : dll.second.symbols) {
+          symbol.second = symbolIndex;
+          symbolIndex += (sizeof(ImportByName::hint) + symbol.first.size() + 2) / 2 * 2;
+        }
+        dll.second.nameIndex = symbolIndex;
+        symbolIndex += alignment(dll.first.size() + 1, 2);
+      }
+
+      for (auto& dll : dlls) {
+        ImportDescriptor disc{};
+        disc.originalFirstThunk = dll.second.index;
+        disc.name = dll.second.nameIndex;
+        disc.firstThunk = dll.second.thunkIndex;
+        rdataSectionRawData << disc;
+      }
+      rdataSectionRawData.resize(rdataSectionRawData.size() + sizeof(ImportDescriptor));
+
+      size_t index = 0;
+      for (auto& dll : dlls) {
+        for (auto& symbol : dll.second.symbols) {
+          rdataSectionRawData << symbol.second;
+          libSymbols[symbol.first].address = index + rdataBase;
+          rdataSectionRawData[index++] = ((symbol.second >> 0) & 0xFF);
+          rdataSectionRawData[index++] = ((symbol.second >> 8) & 0xFF);
+          rdataSectionRawData[index++] = ((symbol.second >> 16) & 0xFF);
+          rdataSectionRawData[index++] = ((symbol.second >> 24) & 0xFF);
+          rdataSectionRawData[index++] = ((symbol.second >> 32) & 0xFF);
+          rdataSectionRawData[index++] = ((symbol.second >> 40) & 0xFF);
+          rdataSectionRawData[index++] = ((symbol.second >> 48) & 0xFF);
+          rdataSectionRawData[index++] = ((symbol.second >> 56) & 0xFF);
+        }
+        index += sizeof(uint64_t);
+        rdataSectionRawData.resize(rdataSectionRawData.size() + sizeof(uint64_t));
+      }
+      ntHeader.optionalHeader.dataDirectory[1].size = index;
+
+      for (auto& dll : dlls) {
+        for (auto& symbol : dll.second.symbols) {
+          rdataSectionRawData << libSymbols[symbol.first].member.header.hint;
+          for (auto c : symbol.first) {
+            rdataSectionRawData << c;
+          }
+          rdataSectionRawData << '\0';
+          if (symbol.first.size() % 2 == 0) rdataSectionRawData << '\0';
+        }
+        for (auto c : dll.first) {
+          rdataSectionRawData << c;
+        }
+        rdataSectionRawData << '\0';
+        if (dll.first.size() % 2 == 0) rdataSectionRawData << '\0';
+      }
+    }
+
+    ntHeader.optionalHeader.sizeOfInitData = rdataSectionRawData.size();
+
+    if (errors.empty()) return ok();
+    else return error(errors);
+  }
+  Result<_, std::vector<std::string>> Linker::write(const CompilerOption& option)
+  {
     auto path = std::filesystem::path(option.outDir) / (option.out + ".exe");
     std::ofstream stream(path, std::ios::binary);
     if(!stream) {
-      return some(std::vector{ "ファイル " +  path.string() + " が開けません。" });
+      return error(std::vector{ "ファイル " +  path.string() + " が開けません。" });
     }
 
     stream.write((char*)&dosHeader, sizeof(dosHeader));
@@ -344,6 +492,6 @@ namespace pickc::windows::x64
     stream.write(b, relocSection.sizeOfRawData - relocSection.misc.virtualSize);
     delete[] b;
 
-    return none;
+    return ok();
   }
 }

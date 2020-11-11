@@ -86,111 +86,128 @@ namespace pickc::pcir
       auto fn = pcir.fnSection[i];
       std::cout << "Function #" << i << std::endl;
       std::cout << "    Type:                         " << fn->type->type.toString() << std::endl;
-      std::cout << "    Entry Flow:                   Flow #" << indexOf(fn->flows, fn->entryFlow) << std::endl;
-      std::cout << "    Registers:" << std::endl;
-      for(size_t j = 0, jl = fn->regs.size(); j < jl; ++j) {
-        std::cout << "        Register #" << j << std::endl;
-        std::cout << "            Type:                 " << fn->regs[j]->type->type.toString() << std::endl;
-      }
-      std::cout << "    Flows:" << std::endl;
-      for(size_t j = 0, jl = fn->flows.size(); j < jl; ++j) {
-        auto flow = fn->flows[j];
-        std::cout << "        Flow #" << j << std::endl;
-        std::cout << "            Parent:               ";
-        if(flow->parent == nullptr) std::cout << "none" << std::endl;
-        else std::cout << "Flow #" << indexOf(fn->flows, flow->parent) << std::endl;
-        std::cout << "            Flow Type:            ";
-        if(flow->flowType & FLOW_TYPE_NORMAL) {
-          std::cout << "NORMAL" << std::endl;
-          std::cout << "            Next Flow:            ";
-          if(flow->next == nullptr) std::cout << "none" << std::endl;
-          else std::cout << "Flow #" << indexOf(fn->flows, flow->next) << std::endl;
+      std::cout << "    Function Type:                " << (fn->fnType == FN_TYPE_FUNCTION ? "function" : "extern") << std::endl;
+      if(fn->fnType == FN_TYPE_FUNCTION) {
+        std::cout << "    Entry Flow:                   Flow #" << indexOf(fn->flows, fn->entryFlow) << std::endl;
+        std::cout << "    Registers:" << std::endl;
+        for(size_t j = 0, jl = fn->regs.size(); j < jl; ++j) {
+          std::cout << "        Register #" << j << std::endl;
+          std::cout << "            Type:                 " << fn->regs[j]->type->type.toString() << std::endl;
         }
-        else if(flow->flowType & FLOW_TYPE_COND_BRANCH) {
-          std::cout << "COND_BRANCH" << std::endl;
-          std::cout << "            Cond:                 Register #" << indexOf(fn->regs, flow->cond) << std::endl;
-          std::cout << "            Then Flow:            Flow #" << indexOf(fn->flows, flow->thenFlow) << std::endl;
-          std::cout << "            Else Flow:            Flow #" << indexOf(fn->flows, flow->elseFlow) << std::endl;
-        }
-        else if(flow->flowType & FLOW_TYPE_END_POINT) {
-          std::cout << "END_POINT" << std::endl;
-          std::cout << "            Return Register       ";
-          if(flow->retReg != nullptr) std::cout << "#" << indexOf(fn->regs, flow->retReg) << std::endl;
-          else std::cout << "void" << std::endl;
-        }
+        std::cout << "    Flows:" << std::endl;
+        for(size_t j = 0, jl = fn->flows.size(); j < jl; ++j) {
+          auto flow = fn->flows[j];
+          std::cout << "        Flow #" << j << std::endl;
+          std::cout << "            Parent:               ";
+          if(flow->parent == nullptr) std::cout << "none" << std::endl;
+          else std::cout << "Flow #" << indexOf(fn->flows, flow->parent) << std::endl;
+          std::cout << "            Flow Type:            ";
+          if(flow->flowType & FLOW_TYPE_NORMAL) {
+            std::cout << "NORMAL" << std::endl;
+            std::cout << "            Next Flow:            ";
+            if(flow->next == nullptr) std::cout << "none" << std::endl;
+            else std::cout << "Flow #" << indexOf(fn->flows, flow->next) << std::endl;
+          }
+          else if(flow->flowType & FLOW_TYPE_COND_BRANCH) {
+            std::cout << "COND_BRANCH" << std::endl;
+            std::cout << "            Cond:                 Register #" << indexOf(fn->regs, flow->cond) << std::endl;
+            std::cout << "            Then Flow:            Flow #" << indexOf(fn->flows, flow->thenFlow) << std::endl;
+            std::cout << "            Else Flow:            Flow #" << indexOf(fn->flows, flow->elseFlow) << std::endl;
+          }
+          else if(flow->flowType & FLOW_TYPE_END_POINT) {
+            std::cout << "END_POINT" << std::endl;
+            std::cout << "            Return Register:      ";
+            if(flow->retReg != nullptr) std::cout << "#" << indexOf(fn->regs, flow->retReg) << std::endl;
+            else std::cout << "void" << std::endl;
+          }
 
-        std::cout << "            Code:" << std::endl;
-        for(size_t k = 0, kl = flow->code.size(); k < kl; ++k) {
-          const auto binary = [&](const std::string& inst) {
-            std::cout << inst << " #" << get32(flow->code, k) << " #" << get32(flow->code, k) << " #" << get32(flow->code, k) << std::endl;
-          };
-          const auto unary = [&](const std::string& inst) {
-            std::cout << inst << " #" << get32(flow->code, k) << " #" << get32(flow->code, k) << std::endl;
-          };
-          std::cout << "                ";
-          switch(flow->code[k]) {
-            case Add: binary("ADD"); break;
-            case Sub: binary("SUB"); break;
-            case Mul: binary("MUL"); break;
-            case Div: binary("DIV"); break;
-            case Mod: binary("MOD"); break;
-            case Inc: unary("INC"); break;
-            case Dec: unary("DEC"); break;
-            case Pos: unary("POS"); break;
-            case Neg: unary("NEG"); break;
-            case EQ: binary("EQ"); break;
-            case NEQ: binary("NEQ"); break;
-            case GT: binary("GT"); break;
-            case GE: binary("GE"); break;
-            case LT: binary("LT"); break;
-            case LE: binary("LE"); break;
-            case Imm: {
-              auto dist = get32(flow->code, k);
-              std::cout << "IMM #" << dist << " ";
-              switch(fn->regs[dist]->type->types) {
-                case Types::I8:
-                case Types::U8:
-                  std::cout << (int)get8(flow->code, k) << std::endl;
-                  break;
-                case Types::I16:
-                case Types::U16:
-                  std::cout << get16(flow->code, k) << std::endl;
-                  break;
-                case Types::I32:
-                case Types::U32:
-                  std::cout << get32(flow->code, k) << std::endl;
-                  break;
-                case Types::I64:
-                case Types::U64:
-                  std::cout << get64(flow->code, k) << std::endl;
-                  break;
+          std::cout << "            Code:" << std::endl;
+          for(size_t k = 0, kl = flow->code.size(); k < kl; ++k) {
+            const auto binary = [&](const std::string& inst) {
+              std::cout << inst << " #" << get32(flow->code, k) << " #" << get32(flow->code, k) << " #" << get32(flow->code, k) << std::endl;
+            };
+            const auto unary = [&](const std::string& inst) {
+              std::cout << inst << " #" << get32(flow->code, k) << " #" << get32(flow->code, k) << std::endl;
+            };
+            std::cout << "                ";
+            switch(flow->code[k]) {
+              case Add: binary("ADD"); break;
+              case Sub: binary("SUB"); break;
+              case Mul: binary("MUL"); break;
+              case Div: binary("DIV"); break;
+              case Mod: binary("MOD"); break;
+              case Inc: unary("INC"); break;
+              case Dec: unary("DEC"); break;
+              case Pos: unary("POS"); break;
+              case Neg: unary("NEG"); break;
+              case EQ: binary("EQ"); break;
+              case NEQ: binary("NEQ"); break;
+              case GT: binary("GT"); break;
+              case GE: binary("GE"); break;
+              case LT: binary("LT"); break;
+              case LE: binary("LE"); break;
+              case Imm: {
+                auto dist = get32(flow->code, k);
+                std::cout << "IMM #" << dist << " ";
+                switch(fn->regs[dist]->type->types) {
+                  case Types::I8:
+                  case Types::U8:
+                    std::cout << (int)get8(flow->code, k) << std::endl;
+                    break;
+                  case Types::I16:
+                  case Types::U16:
+                    std::cout << get16(flow->code, k) << std::endl;
+                    break;
+                  case Types::I32:
+                  case Types::U32:
+                    std::cout << get32(flow->code, k) << std::endl;
+                    break;
+                  case Types::I64:
+                  case Types::U64:
+                    std::cout << get64(flow->code, k) << std::endl;
+                    break;
+                  case Types::Null:
+                    std::cout << "null" << std::endl;
+                    break;
+                  case Types::Char:
+                    std::cout << get8(flow->code, k) << std::endl;
+                    break;
+                  default:
+                    assert(false);
+                }
+                break;
               }
-              break;
-            }
-            case Call: {
-              std::cout << "CALL #" << get32(flow->code, k) << " #";
-              auto call = get32(flow->code, k);
-              std::cout << call << " (";
-              auto type = fn->regs[call]->type;
-              assert(type->types == Types::Function);
-              for(size_t arg = 0; arg < type->numOfArgs; ++arg) {
-                std::cout << "#" << get32(flow->code, k);
-                if(arg + 1 < type->numOfArgs) std::cout << " ";
+              case Call: {
+                std::cout << "CALL #" << get32(flow->code, k) << " #";
+                auto call = get32(flow->code, k);
+                std::cout << call << " (";
+                auto type = fn->regs[call]->type;
+                assert(type->types == Types::Function);
+                for(size_t arg = 0; arg < type->numOfArgs; ++arg) {
+                  std::cout << "#" << get32(flow->code, k);
+                  if(arg + 1 < type->numOfArgs) std::cout << " ";
+                }
+                std::cout << ")" << std::endl;
+                break;
               }
-              std::cout << ")" << std::endl;
-              break;
+              case LoadFn: std::cout << "LOADFN Register #" << get32(flow->code, k) << " Function #" << get32(flow->code, k) << std::endl; break;
+              case LoadArg: std::cout << "LOADARG Register #" << get32(flow->code, k) << " Arg #" << get32(flow->code, k) << std::endl; break;
+              case LoadSymbol: std::cout << "LOADSYMBOL Register #" << get32(flow->code, k) << " Symbol " << pcir.textSection[get32(flow->code, k)]->text << std::endl; break;
+              case LoadString: std::cout << "LOADSTRING Register #" << get32(flow->code, k) << " Text #" << get32(flow->code, k) << std::endl; break;
+              case LoadElem: std::cout << "LOADELEM #" << get32(flow->code, k) << " #" << get32(flow->code, k) << "[#" << get32(flow->code, k) << "]" << std::endl; break;
+              case Alloc: std::cout << "ALLOC #" << get32(flow->code, k) << " #" << get32(flow->code, k) << std::endl; break;
+              case Mov: std::cout << "MOV #" << get32(flow->code, k) << " #" << get32(flow->code, k) << std::endl; break;
+              case Phi: std::cout << "Phi #" << get32(flow->code, k) << " #" << get32(flow->code, k) << " #" << get32(flow->code, k) << std::endl; break;
+              default:
+                assert(false);
+                std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)flow->code[k] << std::endl;
+                break;
             }
-            case LoadFn: std::cout << "LOADFN Register #" << get32(flow->code, k) << " Function #" << get32(flow->code, k) << std::endl; break;
-            case LoadArg: std::cout << "LOADARG Register #" << get32(flow->code, k) << " Arg #" << get32(flow->code, k) << std::endl; break;
-            case LoadSymbol: std::cout << "LOADSYMBOL Register #" << get32(flow->code, k) << " Symbol " << pcir.textSection[get32(flow->code, k)]->text << std::endl; break;
-            case Mov: std::cout << "MOV #" << get32(flow->code, k) << " #" << get32(flow->code, k) << std::endl; break;
-            case Phi: std::cout << "Phi #" << get32(flow->code, k) << " #" << get32(flow->code, k) << " #" << get32(flow->code, k) << std::endl; break;
-            default:
-              assert(false);
-              std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)flow->code[k] << std::endl;
-              break;
           }
         }
+      }
+      else {
+        std::cout << "    Extern Name:                  Text #" << indexOf(pcir.textSection, fn->externName) << std::endl;
       }
     }
   }

@@ -144,6 +144,27 @@ namespace pickc::pcir
   */
   constexpr uint8_t LoadSymbol = 0x32;
   /**
+   * LoadString
+   * 文字列を読み込む。dist = str
+   * 文字列はテキストセクションに保存する。
+   * LoadString dist(u32, index of regs), str(u32, index of text section)
+  */
+  constexpr uint8_t LoadString = 0x33;
+  /**
+   * LoadElem
+   * 配列の要素を読み込む。dist = array[index]
+   * arrayの型は配列型かポインタ型でなければならない。
+   * LoadElem dist(u32, index of regs), array(u32, index of regs), index(u32, index of regs)
+  */
+  constexpr uint8_t LoadElem = 0x34;
+  /**
+   * Alloc
+   * レジスタの値を書き換える。dist[index] = src
+   * 静的単一代入を維持するため、この命令は配列や構造体のメンバにのみ使用する。
+   * Alloc dist(u32, index of regs), src(u32, index of regs)
+  */
+  constexpr uint8_t Alloc = 0x35;
+  /**
    * Mov
    * 移動命令。レジスタの持つ値をコピーする。dist = src
    * この命令はシャローコピーを行う。

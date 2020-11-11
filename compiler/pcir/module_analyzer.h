@@ -1,7 +1,7 @@
 #ifndef PICKC_PCIR_MODULE_ANALYZER_H_
 #define PICKC_PCIR_MODULE_ANALYZER_H_
 
-#include <memory>
+#include <unordered_set>
 
 #include "pickc/module_tree.h"
 #include "utils/option.h"
@@ -13,6 +13,7 @@ namespace pickc::pcir
   {
     SemanticAnalyzer* sa;
     ModuleTree* tree;
+    std::unordered_set<ModuleTree*> trees;
     std::string createSemanticError(const parser::Node* node, const std::string& message);
     // void型を返す時はnullptrを返す。
     Result<Register*, std::vector<std::string>> exprAnalyze(const parser::ExpressionNode* expr, FlowNode** flow);
@@ -25,9 +26,10 @@ namespace pickc::pcir
     Result<Register*, std::vector<std::string>> varDefAnalyze(const parser::VariableDefineNode* varDef, FlowNode** flow);
     Result<Register*, std::vector<std::string>> fnDefAnalyze(const parser::FunctionDefineNode* fnDef, FlowNode** flow);
     Result<Register*, std::vector<std::string>> ifAnalyze(const parser::IfNode* ifNode, FlowNode** flow);
-    Symbol* findGlobalVar(const parser::VariableNode* var);
+    Result<Symbol*, std::vector<std::string>> findGlobalVar(const parser::VariableNode* var);
+    Result<Register*, std::vector<std::string>> whileAnalyze(const parser::WhileNode* whileNode, FlowNode** flow);
   public:
-    ModuleAnalyzer(SemanticAnalyzer* sa, ModuleTree* tree);
+    ModuleAnalyzer(SemanticAnalyzer* sa, ModuleTree* tree, const std::unordered_set<ModuleTree*>& trees);
     Option<std::vector<std::string>> declare();
     Option<std::vector<std::string>> analyze();
   };
