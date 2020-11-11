@@ -20,6 +20,11 @@ namespace pickc::pcir
     whileFlow->belong = (*flow)->belong;
     whileFlow->belong->flows.push_back(whileFlow);
 
+    if(auto cond = exprAnalyze(whileNode->comp, flow)) {
+      whileFlow->cond = cond.get();
+    }
+    else errors += cond.err();
+
     (*flow)->nextFlow = whileFlow;
 
     auto bodyFlow = new FlowNode();
@@ -28,9 +33,6 @@ namespace pickc::pcir
     bodyFlow->belong = (*flow)->belong;
     bodyFlow->belong->flows.push_back(bodyFlow);
     auto begin = bodyFlow->currentVars();
-
-    if(auto cond = exprAnalyze(whileNode->comp, &whileFlow)) whileFlow->cond = cond.get();
-    else errors += cond.err();
 
     auto next = new FlowNode();
     next->type = FlowType::Undecided;

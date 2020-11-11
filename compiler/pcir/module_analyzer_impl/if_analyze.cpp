@@ -14,18 +14,20 @@ namespace pickc::pcir
 
     std::vector<std::string> errors;
 
-    (*flow)->type = FlowType::Normal;
-
     auto ifFlow = new FlowNode();
     ifFlow->type = FlowType::ConditionalBranch;
     ifFlow->parentFlow = *flow;
     ifFlow->belong = (*flow)->belong;
     ifFlow->belong->flows.push_back(ifFlow);
 
-    (*flow)->nextFlow = ifFlow;
-
-    if(auto cond = exprAnalyze(ifNode->comp, &ifFlow)) ifFlow->cond = cond.get();
+    if(auto cond = exprAnalyze(ifNode->comp, flow)) {
+      ifFlow->cond = cond.get();
+    }
     else errors += cond.err();
+
+    (*flow)->type = FlowType::Normal;
+
+    (*flow)->nextFlow = ifFlow;
 
     auto begin = (*flow)->currentVars();
 
