@@ -452,7 +452,35 @@ namespace pickc::windows::x64
             body.push_back(new XorOperation(OperationSize::QWord, Operand(Register::RAX), Operand(Register::RAX)));
           }
           else {
-            body.push_back(new MovOperation(getSize(ret->value->type), Operand(Register::RAX), regs[ret->value]));
+            if(regs[ret->value].type == OperandType::Immediate) {
+              body.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RAX), regs[ret->value]));
+            }
+            else {
+              switch(getSize(ret->value->type)) {
+                case OperationSize::Byte:
+                case OperationSize::Word:
+                  if(ret->value->type->type.isSignedInt()) {
+                    body.push_back(new MovSXOperation(OperationSize::QWord, getSize(ret->value->type), Register::RAX, regs[ret->value]));
+                  }
+                  else {
+                    body.push_back(new MovZXOperation(OperationSize::QWord, getSize(ret->value->type), Register::RAX, regs[ret->value]));
+                  }
+                  break;
+                case OperationSize::DWord:
+                  if(ret->value->type->type.isSignedInt()) {
+                    body.push_back(new MovSXDOperation(Register::RAX, regs[ret->value]));
+                  }
+                  else {
+                    body.push_back(new MovOperation(getSize(ret->value->type), Operand(Register::RAX), regs[ret->value]));
+                  }
+                  break;
+                case OperationSize::QWord:
+                  body.push_back(new MovOperation(getSize(ret->value->type), Operand(Register::RAX), regs[ret->value]));
+                  break;
+                default:
+                  assert(false);
+              }
+            }
           }
         }
         insertEpilogue.insert(body.size());
@@ -481,27 +509,28 @@ namespace pickc::windows::x64
       }
       else if(instanceof<bundler::LoadSymbolInstruction>(inst)) {
         auto loadSymbol = dynCast<bundler::LoadSymbolInstruction>(inst);
-        if(keyExists(regs, loadSymbol->dist)) {
-          if(regs[loadSymbol->dist].type == OperandType::Register) {
-            body.push_back(new MovOperation(getSize(loadSymbol->dist->type), regs[loadSymbol->dist], Operand(Relocation(loadSymbol->symbol))));
-          }
-          else {
-            body.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RAX), Operand(Relocation(loadSymbol->symbol))));
-            body.push_back(new MovOperation(getSize(loadSymbol->dist->type), Operand(Register::RAX), Operand(Memory(Register::RAX, 8, false))));
-            body.push_back(new MovOperation(getSize(loadSymbol->dist->type), regs[loadSymbol->dist], Operand(Register::RAX)));
-          }
-        }
-        else {
-          regs[loadSymbol->dist] = createOperand();
-          body.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RAX), Operand(Relocation(loadSymbol->symbol))));
-          if(regs[loadSymbol->dist].type == OperandType::Register) {
-            body.push_back(new MovOperation(getSize(loadSymbol->dist->type), regs[loadSymbol->dist], Operand(Operand(Memory(Register::RAX, 8, false)))));
-          }
-          else {
-            body.push_back(new MovOperation(getSize(loadSymbol->dist->type), Operand(Register::RAX), Operand(Memory(Register::RAX, 8, false))));
-            body.push_back(new MovOperation(getSize(loadSymbol->dist->type), regs[loadSymbol->dist], Operand(Register::RAX)));
-          }
-        }
+        regs[loadSymbol->dist] = Operand(Relocation(loadSymbol->symbol));
+        // if(keyExists(regs, loadSymbol->dist)) {
+        //   if(regs[loadSymbol->dist].type == OperandType::Register) {
+        //     body.push_back(new MovOperation(getSize(loadSymbol->dist->type), regs[loadSymbol->dist], Operand(Relocation(loadSymbol->symbol))));
+        //   }
+        //   else {
+        //     body.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RAX), Operand(Relocation(loadSymbol->symbol))));
+        //     body.push_back(new MovOperation(getSize(loadSymbol->dist->type), Operand(Register::RAX), Operand(Memory(Register::RAX, 8, false))));
+        //     body.push_back(new MovOperation(getSize(loadSymbol->dist->type), regs[loadSymbol->dist], Operand(Register::RAX)));
+        //   }
+        // }
+        // else {
+        //   regs[loadSymbol->dist] = createOperand();
+        //   body.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RAX), Operand(Relocation(loadSymbol->symbol))));
+        //   if(regs[loadSymbol->dist].type == OperandType::Register) {
+        //     body.push_back(new MovOperation(getSize(loadSymbol->dist->type), regs[loadSymbol->dist], Operand(Operand(Memory(Register::RAX, 8, false)))));
+        //   }
+        //   else {
+        //     body.push_back(new MovOperation(getSize(loadSymbol->dist->type), Operand(Register::RAX), Operand(Memory(Register::RAX, 8, false))));
+        //     body.push_back(new MovOperation(getSize(loadSymbol->dist->type), regs[loadSymbol->dist], Operand(Register::RAX)));
+        //   }
+        // }
       }
       else if(instanceof<bundler::LoadStringInstruction>(inst)) {
         auto loadStr = dynCast<bundler::LoadStringInstruction>(inst);

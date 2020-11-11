@@ -82,10 +82,6 @@
 				{
 					"name": "constant.numeric.float.pick",
 					"match": "\\b\\d+(\\.\\d+)?(e(\\+|-)\\d+)?(f32|f64)?\\b"
-				},
-				{
-					"name": "constant.character.pick",
-					"match": "\\b'.'\\b"
 				}
 			]
 		},
@@ -95,7 +91,23 @@
 					"name": "string.quoted.double.pick",
 					"begin": "\"",
 					"end": "\"",
-					"match": "\"[^\\n]*\""
+					"match": "\"[^\\n]*\"",
+					"patterns": [
+						{
+							"name": "constant.character.escape.pick",
+							"match": "\\\\."
+						}
+					]
+				},
+				{
+					"name": "string.quoted.single.pick",
+					"match": "'\\\\?.'",
+					"patterns": [
+						{
+							"name": "constant.character.escape.pick",
+							"match": "\\\\."
+						}
+					]
 				},
 				{
 					"name": "string.interpolated.pick",
