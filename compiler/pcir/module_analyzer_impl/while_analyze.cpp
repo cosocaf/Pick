@@ -15,24 +15,27 @@ namespace pickc::pcir
     (*flow)->type = FlowType::Normal;
 
     auto whileFlow = new FlowNode();
-    whileFlow->type = FlowType::ConditionalBranch;
+    whileFlow->type = FlowType::Undecided;
     whileFlow->parentFlow = *flow;
     whileFlow->belong = (*flow)->belong;
     whileFlow->belong->flows.push_back(whileFlow);
+    (*flow)->nextFlow = whileFlow;
 
-    if(auto cond = exprAnalyze(whileNode->comp, flow)) {
-      whileFlow->cond = cond.get();
+    auto begin = whileFlow->currentVars();
+
+    if(auto cond = exprAnalyze(whileNode->comp, &whileFlow)) {
+      if(whileFlow->type != FlowType::EndPoint) {
+        whileFlow->type = FlowType::ConditionalBranch;
+        whileFlow->cond = cond.get();
+      }
     }
     else errors += cond.err();
-
-    (*flow)->nextFlow = whileFlow;
 
     auto bodyFlow = new FlowNode();
     bodyFlow->type = FlowType::Undecided;
     bodyFlow->parentFlow = *flow;
     bodyFlow->belong = (*flow)->belong;
     bodyFlow->belong->flows.push_back(bodyFlow);
-    auto begin = bodyFlow->currentVars();
 
     auto next = new FlowNode();
     next->type = FlowType::Undecided;

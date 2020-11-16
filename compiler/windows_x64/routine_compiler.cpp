@@ -510,27 +510,6 @@ namespace pickc::windows::x64
       else if(instanceof<bundler::LoadSymbolInstruction>(inst)) {
         auto loadSymbol = dynCast<bundler::LoadSymbolInstruction>(inst);
         regs[loadSymbol->dist] = Operand(Relocation(loadSymbol->symbol));
-        // if(keyExists(regs, loadSymbol->dist)) {
-        //   if(regs[loadSymbol->dist].type == OperandType::Register) {
-        //     body.push_back(new MovOperation(getSize(loadSymbol->dist->type), regs[loadSymbol->dist], Operand(Relocation(loadSymbol->symbol))));
-        //   }
-        //   else {
-        //     body.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RAX), Operand(Relocation(loadSymbol->symbol))));
-        //     body.push_back(new MovOperation(getSize(loadSymbol->dist->type), Operand(Register::RAX), Operand(Memory(Register::RAX, 8, false))));
-        //     body.push_back(new MovOperation(getSize(loadSymbol->dist->type), regs[loadSymbol->dist], Operand(Register::RAX)));
-        //   }
-        // }
-        // else {
-        //   regs[loadSymbol->dist] = createOperand();
-        //   body.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RAX), Operand(Relocation(loadSymbol->symbol))));
-        //   if(regs[loadSymbol->dist].type == OperandType::Register) {
-        //     body.push_back(new MovOperation(getSize(loadSymbol->dist->type), regs[loadSymbol->dist], Operand(Operand(Memory(Register::RAX, 8, false)))));
-        //   }
-        //   else {
-        //     body.push_back(new MovOperation(getSize(loadSymbol->dist->type), Operand(Register::RAX), Operand(Memory(Register::RAX, 8, false))));
-        //     body.push_back(new MovOperation(getSize(loadSymbol->dist->type), regs[loadSymbol->dist], Operand(Register::RAX)));
-        //   }
-        // }
       }
       else if(instanceof<bundler::LoadStringInstruction>(inst)) {
         auto loadStr = dynCast<bundler::LoadStringInstruction>(inst);
@@ -614,6 +593,17 @@ namespace pickc::windows::x64
       else if(instanceof<bundler::CallInstruction>(inst)) {
         auto call = dynCast<bundler::CallInstruction>(inst);
         assert(regs.find(call->fn) != regs.end());
+
+        Operand fn;
+        if(regs[call->fn].type == OperandType::Relocation && regs[call->fn].reloc.type == RelocationType::Symbol) {
+          body.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RAX), regs[call->fn]));
+          body.push_back(new MovOperation(OperationSize::QWord, Operand(Register::RAX), Operand(Memory(Register::RAX, 8, false))));
+          fn = Operand(Register::RAX);
+        }
+        else {
+          fn = regs[call->fn];
+        }
+
         #ifndef NDEBUG
         for(const auto& arg : call->args) {
           assert(regs.find(arg) != regs.end());
@@ -634,7 +624,7 @@ namespace pickc::windows::x64
         if(shadowStore) {
           body.push_back(new SubOperation(OperationSize::QWord, Operand(Register::RSP), Operand(shadowStore)));
         }
-        body.push_back(new CallOperation(routine, regs[call->fn]));
+        body.push_back(new CallOperation(routine, fn));
         // 引数の巻き戻し
         if(!call->args.empty()) {
           auto rewind = call->args.size() * 8;
@@ -704,17 +694,19 @@ namespace pickc::windows::x64
 
     routine->code += prologue;
     size_t curBodyIndex = 0;
+    std::vector<size_t> bundleIndexes = routine->bundleIndexes;
     for(auto insert : insertEpilogue) {
       routine->code.reserve(routine->code.size() + insert - curBodyIndex);
       routine->code.insert(routine->code.end(), body.begin() + curBodyIndex, body.begin() + insert);
       routine->code += epilogue;
       curBodyIndex = insert;
-      for(auto& index : routine->bundleIndexes) {
-        if(index >= insert) index += epilogue.size();
+      for(size_t i = 0, l = bundleIndexes.size(); i < l; ++i) {
+        if(routine->bundleIndexes[i] >= insert) bundleIndexes[i] += epilogue.size();
       }
     }
     routine->code.insert(routine->code.end(), body.begin() + curBodyIndex, body.end());
     
+    routine->bundleIndexes = bundleIndexes;
     for(auto& index : routine->bundleIndexes) {
       index += prologue.size();
     }

@@ -191,7 +191,7 @@ namespace pickc::pcir
   };
   struct PCIRNormalFlow
   {
-    uint32_t indexOfNextFlow;             // Index of next flow. If not, set it to -1(0xFFFFFFFF).
+    uint32_t indexOfNextFlow;             // Index of next flow.
   };
   struct PCIRCondBranchFlow
   {
