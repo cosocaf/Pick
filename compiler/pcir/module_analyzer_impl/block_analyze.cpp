@@ -39,6 +39,7 @@ namespace pickc::pcir
             }
             else {
               child->retReg = value.get();
+              child->result = child->retReg;
             }
           }
           else {
@@ -60,6 +61,8 @@ namespace pickc::pcir
         deadFlow->parentFlow = child;
         deadFlow->belong = child->belong;
         deadFlow->belong->flows.push_back(deadFlow);
+        deadFlow->retReg = child->retReg;
+        deadFlow->result = child->result;
         child = deadFlow;
       }
       else {

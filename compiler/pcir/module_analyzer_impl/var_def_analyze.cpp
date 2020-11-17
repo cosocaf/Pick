@@ -39,7 +39,7 @@ namespace pickc::pcir
       reg->curVar = new Variable{
         varDef->name->name,
         varDef->isMut ? Mutability::Mutable : Mutability::Immutable,
-        VariableStatus::InUse,
+        varDef->init ? VariableStatus::InUse : VariableStatus::Uninited,
         expectedType,
         reg
       };

@@ -10,7 +10,17 @@ namespace pickc::pcir
   {
     using namespace parser;
     if(instanceof<BlockNode>(expr)) {
-      return blockAnalyze(dynCast<BlockNode>(expr), flow);
+      if(auto block = blockAnalyze(dynCast<BlockNode>(expr), flow)) {
+        if(block.get()) return ok(block.get());
+        auto reg = new Register();
+        reg->type = Types::Void;
+        reg->vType = ValueType::RValue;
+        (*flow)->addReg(reg);
+        return ok(reg);
+      }
+      else {
+        return error(block.err());
+      }
     }
     else if(instanceof<VariableNode>(expr)) {
       return varAnalyze(dynCast<VariableNode>(expr), flow);

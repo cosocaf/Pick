@@ -15,7 +15,6 @@ namespace pickc::pcir
     ModuleTree* tree;
     std::unordered_set<ModuleTree*> trees;
     std::string createSemanticError(const parser::Node* node, const std::string& message);
-    // void型を返す時はnullptrを返す。
     Result<Register*, std::vector<std::string>> exprAnalyze(const parser::ExpressionNode* expr, FlowNode** flow);
     // 何も返さない場合はnullptrを返す。
     Result<Register*, std::vector<std::string>> blockAnalyze(const parser::BlockNode* block, FlowNode** flow);

@@ -159,7 +159,7 @@ namespace pickc::pcir
       else if(left.get()->curVar == nullptr && left.get()->vType == ValueType::RValue) {
         errors.push_back(createSemanticError(asign, "右辺値に値は代入できません。"));
       }
-      else if(left.get()->curVar != nullptr && left.get()->curVar->mut == Mutability::Immutable) {
+      else if(left.get()->curVar != nullptr && left.get()->curVar->mut == Mutability::Immutable && left.get()->curVar->status != VariableStatus::Uninited) {
         errors.push_back(createSemanticError(asign, "変数 " + left.get()->curVar->name + " はイミュータブルです。"));
       }
       else if(right.get()->curVar != nullptr) {
@@ -178,6 +178,10 @@ namespace pickc::pcir
         if(left.get()->curVar != nullptr) {
           left.get()->curVar->status = VariableStatus::InUse;
           left.get()->curVar->reg = right.get();
+          left.get()->curVar->reg->curVar = left.get()->curVar;
+          if(left.get()->type.isAny()) {
+            left.get()->type = Type::merge(Mov, left.get()->type, right.get()->type);
+          }
         }
         else {
           auto inst = new AllocInstruction();
