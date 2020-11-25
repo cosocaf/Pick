@@ -80,7 +80,7 @@ namespace pickc::windows::x64
         if(size == OperationSize::Byte || isMin) operand << static_cast<int8_t>(src.imm);
         else if(size == OperationSize::Word) operand << static_cast<int16_t>(src.imm);
         else if(size == OperationSize::DWord) operand << static_cast<int32_t>(src.imm);
-        else if(src.imm <= INT32_MAX && src.imm >= INT32_MIN) operand << static_cast<int32_t>(src.imm);
+        else if(in32bit(src.imm)) operand << static_cast<int32_t>(src.imm);
         else assert(false);
       }
       else {

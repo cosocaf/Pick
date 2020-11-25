@@ -178,8 +178,12 @@ namespace pickc::windows::x64
     // ModR/Mのr/mまたはSIBのbaseまたはオペコードのreg各フィールド拡張
     static constexpr uint8_t REXB = 0b0000'0001;
     static uint8_t modRM(Register reg, Register rm);
-    // value <= INT8_MAX && value >= INT8_MIN
-    static bool in8bit(int64_t value);
+    static inline bool in8bit(int64_t value) {
+      return value <= INT8_MAX && value >= INT8_MIN;
+    }
+    static inline bool in32bit(int64_t value) {
+      return value <= INT32_MAX && value >= INT32_MIN;
+    }
   public:
     Operation(OperationSize size);
     virtual ~Operation();

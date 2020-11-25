@@ -11,6 +11,11 @@
 int main(char argc, char* argv[])
 {
   using namespace pickc;
+
+  #ifndef NDEBUG
+  std::cout << CONSOLE_FG_GREEN << VERSION << " Debug Build\n" << std::endl;
+  #endif // NDEBUG
+
   auto option = CompilerOption::create(argc, argv);
   if(!option) {
     std::cout << CONSOLE_FG_RED << option.err() << CONSOLE_DEFAULT << std::endl;
@@ -61,6 +66,7 @@ int main(char argc, char* argv[])
     }
     default:
       assert(false);
+      return STATUS_UNKNOWN_PLATFORM;
   }
   return STATUS_SUCCESS;
 }

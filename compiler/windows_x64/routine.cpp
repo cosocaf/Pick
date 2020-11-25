@@ -81,10 +81,6 @@ namespace pickc::windows::x64
     }
     return modRM;
   }
-  bool Operation::in8bit(int64_t value)
-  {
-    return value <= INT8_MAX && value >= INT8_MIN;
-  }
   Memory::Memory(Register base, size_t numBytes, bool needAddressFix) : base(some(base)), scale(none), index(0), disp(0), numBytes(numBytes), needAddressFix(needAddressFix) {}
   Memory::Memory(Register base, int32_t disp, size_t numBytes, bool needAddressFix) : base(some(base)), scale(none), index(0), disp(disp), numBytes(numBytes), needAddressFix(needAddressFix) {}
   Memory::Memory(Register base, Register scale, uint8_t index, int32_t disp, size_t numBytes, bool needAdressFix) : base(some(base)), scale(some(scale)), index(index), disp(disp), numBytes(numBytes), needAddressFix(needAddressFix) {}

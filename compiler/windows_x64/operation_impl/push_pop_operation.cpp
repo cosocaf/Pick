@@ -57,11 +57,14 @@ namespace pickc::windows::x64
       case OperandType::Immediate:
         if(in8bit(value.imm)) {
           opcode.push_back(0x6A);
-          opcode << static_cast<uint8_t>(value.imm);
+          operand << static_cast<uint8_t>(value.imm);
+        }
+        else if(in32bit(value.imm)) {
+          opcode.push_back(0x68);
+          operand << static_cast<int32_t>(value.imm);
         }
         else {
-          opcode.push_back(0x68);
-          opcode << value.imm;
+          assert(false);
         }
         break;
       default:
@@ -69,7 +72,7 @@ namespace pickc::windows::x64
     }
     BinaryVec code;
     if(rex) code << static_cast<uint8_t>(REX | rex);
-    code << opcode;
+    code << opcode << operand;
     return code;
   }
 

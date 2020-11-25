@@ -69,7 +69,7 @@ namespace pickc::windows::x64
           opcode.push_back(0xB8 | modRM(Register::RAX, dist.reg));
           if(size == OperationSize::Word) operand << static_cast<int16_t>(src.imm);
           else if(size == OperationSize::DWord) operand << static_cast<int32_t>(src.imm);
-          else if(src.imm <= INT32_MAX && src.imm >= INT32_MIN) {
+          else if(in32bit(src.imm)) {
             rex &= ~REXW;
             operand << static_cast<int32_t>(src.imm);
           }
