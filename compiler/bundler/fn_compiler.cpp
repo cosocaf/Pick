@@ -332,6 +332,7 @@ namespace pickc::bundler
       if(!res) errors += res.err();
       auto jmp = new JmpInstruction();
       jmp->cond = regs[flow->cond];
+      jmp->cond->used[flow] = flows[flow].size();
       flows[flow].push_back(jmp);
       jmpTo[jmp] = { flow->thenFlow, flow->elseFlow };
     }
@@ -339,6 +340,7 @@ namespace pickc::bundler
       auto ret = new RetInstruction();
       if(flow->retReg != nullptr) {
         ret->value = regs[flow->retReg];
+        ret->value->used[flow] = flows[flow].size();
       }
       else {
         ret->value = nullptr;
