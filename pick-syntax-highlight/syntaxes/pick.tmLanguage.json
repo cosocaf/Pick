@@ -29,31 +29,57 @@
 					"match": "\\b(pub|pri|extern|import)\\b"
 				},
 				{
-					"match": "\\b(fn)(\\s+)([^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*)?",
+					"match": "\\b(fn)\\b([^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*)?",
 					"captures": {
-						"1": {"name": "storage.type"},
-						"3": {"name": "entity.name.function"}
+						"1": {"name": "storage.type.pick"},
+						"2": {"name": "entity.name.function.pick"}
 					}
 				},
 				{
-					"match": "\\b(class)\\s+([^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*)?",
+					"match": "\\b(ptr)\\s*<\\s*([^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*)\\s*>",
 					"captures": {
-						"1": {"name": "storage.type"},
-						"2": {"name": "entity.name.class"}
+						"1": {"name": "storage.type.pick"},
+						"2": {"patterns": [
+							{
+								"include": "#storages"
+							},
+							{
+								"name": "entity.name.class.pick",
+								"match": ".*"
+							}
+						]}
+					}
+				},
+				{
+					"name": "storage.type.pick",
+					"match": "\\bfn|void|i8|i16|i32|i64|u8|u16|u32|u64|bool|char|ptr\\b"
+				},
+				{
+					"match": "\\b(class|struct)\\s+([^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*)?",
+					"captures": {
+						"1": {"name": "storage.type.pick"},
+						"2": {"name": "entity.name.class.pick"}
+					}
+				},
+				{
+					"match": "\\b(new)\\s+([^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*)?",
+					"captures": {
+						"1": {"name": "keyword.control.pick"},
+						"2": {"name": "entity.name.class.pick"}
 					}
 				},
 				{
 					"match": "\\b(type)\\s+([^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*)?",
 					"captures": {
-						"1": {"name": "storage.type"},
-						"2": {"name": "entity.name.type"}
+						"1": {"name": "storage.type.pick"},
+						"2": {"name": "entity.name.type.pick"}
 					}
 				},
 				{
 					"match": "\\b(def|mut)\\s+([^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*)?",
 					"captures": {
-						"1": {"name": "storage.type"},
-						"2": {"name": "variable.name"}
+						"1": {"name": "storage.type.pick"},
+						"2": {"name": "variable.name.pick"}
 					}
 				},
 				{
@@ -125,11 +151,11 @@
 		"variables": {
 			"patterns": [
 				{
-					"name": "variable.language",
-					"match": "\\b(true|false|this|self|void|i8|i16|i32|i64|u8|u16|u32|u64|bool|char|ptr|null)\\b"
+					"name": "variable.language.pick",
+					"match": "\\b(true|false|this|self|pad|null)\\b"
 				},
 				{
-					"name": "variable.name",
+					"name": "variable.name.pick",
 					"match": "[^\\s!-?\\[-\\^`\\{-~][^\\s!-/:-?\\[-\\^`\\{-~]*"
 				}
 			]

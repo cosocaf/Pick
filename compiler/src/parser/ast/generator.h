@@ -1,0 +1,123 @@
+/**
+ * @file generator.h
+ * @author cosocaf (cosocaf@gmail.com)
+ * @brief ASTを生成する
+ * @version 0.1
+ * @date 2021-07-23
+ * 
+ * @copyright Copyright (c) 2021 cosocaf
+ * 
+ */
+#ifndef PICKC_PARSER_AST_GENERATOR_H_
+#define PICKC_PARSER_AST_GENERATOR_H_
+
+#include <optional>
+
+#include "node.h"
+#include "token/token.h"
+
+namespace pickc::parser {
+  class ASTGenerator {
+    bool done;
+    RootNode rootNode;
+    TokenSequence sequence;
+    size_t curIndex;
+  public:
+    ASTGenerator(const TokenSequence& sequence);
+    /**
+     * @brief ASTを生成する
+     * 
+     * @return std::optional<RootNode> 
+     */
+    std::optional<RootNode> generate();
+  private:
+    /**
+     * @brief 現在見ているトークンを返す。
+     * 
+     * @return std::optional<Token> 現在見ているトークン
+     */
+    std::optional<Token> cur();
+    /**
+     * @brief 現在見ているトークンを返し、ASTGenerator::curを一つ進める。
+     * 
+     * @return std::optional<Token> 現在見ているトークン
+     */
+    std::optional<Token> next();
+    /**
+     * @brief 現在見ているトークンを第一引数に代入し、ASTGenerator::curを一つ進める。
+     * もし、シーケンスの終わりに達していたら、outputBufferにエラーメッセージを追加する。
+     * 
+     * @param token 現在見ているトークンを受け取る
+     * @param message シーケンスの終わりに達していた場合のエラーメッセージ
+     * @return true シーケンスが終わりに達していない場合
+     * @return false シーケンスが終わりに達していた場合
+     */
+    bool next(Token& token, const std::string& message);
+    /**
+     * @brief 現在見ているトークンを第一引数に代入し、ASTGenerator::curを一つ進める。
+     * もし、シーケンスの終わりに達していたりトークンの種別が期待するものでない場合、outputBufferにエラーメッセージを追加する。
+     * 
+     * @param token 現在見ているトークンを受け取る
+     * @param expect 
+     * @param message シーケンスの終わりに達していた場合のエラーメッセージ
+     * @return true シーケンスが終わりに達していない場合
+     * @return false シーケンスが終わりに達していた場合やトークンの種別が期待するものでない場合
+     */
+    bool next(Token& token, TokenKind expect, const std::string& message);
+    /**
+     * @brief curを一つ戻す。
+     * 
+     */
+    void back();
+
+    /*
+     * ここ以下に定義する関数群はast/analyze以下で実装する。
+     */
+
+    /**
+     * @brief 文を解析する。
+     * 
+     * @param parentNode このノードの親
+     * @return std::optional<StatementNode> 解析結果 
+     */
+    std::optional<StatementNode> analyzeStatement(ASTNode parentNode);
+    /**
+     * @brief 関数を解析する。
+     * sequence[cur].token.kindがTokenKind::FnKeywordである必要がある。
+     * 
+     * @param parentNode このノードの親
+     * @return std::optional<FunctionNode> 解析結果
+     */
+    std::optional<FunctionNode> analyzeFunction(ASTNode parentNode);
+    /**
+     * @brief 式を解析する。
+     * 
+     * @param parentNode このノードの親
+     * @return std::optional<FormulaNode> 解析結果 
+     */
+    std::optional<FormulaNode> analyzeFormula(ASTNode parentNode);
+    /**
+     * @brief ブロックを解析する。
+     * 
+     * @param parentNode このノードの親
+     * @return std::optional<BlockNode> 解析結果
+     */
+    std::optional<BlockNode> analyzeBlock(ASTNode parentNode);
+    /**
+     * @brief 制御構文を解析する。
+     * 
+     * @param parentNode このノードの親
+     * @return std::optional<ControlNode> 解析結果 
+     */
+    std::optional<ControlNode> analyzeControl(ASTNode parentNode);
+    /**
+     * @brief 即値を解析する。
+     * 
+     * @param parentNode このノードの親
+     * @return std::optional<ImmediateNode> 解析結果 
+     */
+    std::optional<ImmediateNode> analyzeImmediate(ASTNode parentNode);
+  };
+}
+
+#endif // PICKC_PARSER_AST_GENERATOR_H_

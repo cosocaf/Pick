@@ -1,5 +1,0 @@
-import Print;
-
-fn greeting(): void {
-  Print::print("‚±‚ñ‚É‚¿‚Í\n", 11);
-}

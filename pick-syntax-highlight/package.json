@@ -1,6 +1,7 @@
 {
     "publisher": "cosocaf",
     "name": "pick-syntax-highlight",
+    "repository": {},
     "displayName": "Pick Syntax Highlight",
     "description": "Language Support for Pick",
     "version": "0.0.1",

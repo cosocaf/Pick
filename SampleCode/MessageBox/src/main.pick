@@ -1,6 +1,0 @@
-extern MessageBoxA(hWnd: u64, text: char[], caption: char[], uType: u32): i32;
-
-fn main() {
-  def MB_OK = 0;
-  MessageBoxA(0, "hello, world", "caption", MB_OK);
-}
