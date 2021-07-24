@@ -63,10 +63,34 @@ namespace pickc {
    * 継承しなくてもこのまま使えるが、場合により継承したクラスと使い分けるべき。
    */
   struct OutputMessage {
+    /**
+     * @brief メッセージの種別。
+     * 
+     */
     OutputMessageKind kind;
+    /**
+     * @brief メッセージの内容。
+     * 
+     */
     std::string message;
+    /**
+     * @brief OutputMessageを構築する。
+     * 
+     * @param kind メッセージの種類。
+     * @param message メッセージ本文。
+     */
     OutputMessage(OutputMessageKind kind, const std::string& message);
+    /**
+     * @brief デストラクタ。
+     * 
+     */
     virtual ~OutputMessage();
+    /**
+     * @brief メッセージをコンソールに出力する形式にフォーマットして出力する。
+     * メッセージを特殊な形にフォーマットする場合にはこの関数をオーバーライドする。
+     * 
+     * @return std::string 出力するメッセージ
+     */
     virtual std::string toString() const;
   };
   /**
@@ -74,11 +98,49 @@ namespace pickc {
    * 出力時にエラー場所周囲のコードも表示する。
    */
   struct CompileErrorMessage : public OutputMessage {
+    /**
+     * @brief エラーが発生したファイル名。
+     * 
+     */
     std::string filename;
+    /**
+     * @brief エラーが発生した行。
+     * 
+     */
     size_t line;
+    /**
+     * @brief エラーが発生したカラム。
+     * 
+     */
     size_t letter;
+    /**
+     * @brief エラー部分の長さ。
+     * 
+     */
     size_t length;
+    /**
+     * @brief CompileErrorMessageを構築する。
+     * 
+     * @param filename エラーが発生したファイル名
+     * @param line エラーが発生した行
+     * @param letter エラーが発生したカラム
+     * @param length エラー部分の長さ
+     * @param message エラーメッセージ
+     */
     CompileErrorMessage(const std::string& filename, size_t line, size_t letter, size_t length, const std::string& message);
+    /**
+     * @brief コンソールに出力する形にフォーマットしたメッセージを返す。
+     * 例えば、以下のようになる。
+     * @code {.unparsed}
+     * [ERROR] 変数xxxは定義されていません。
+     * |1| fn main() {
+     * |2|   def a = xxx;
+     *               ^^^
+     * |3|   return a;
+     * @endcode
+     * 
+     * @return std::string 
+     */
     virtual std::string toString() const override;
   };
   /**
@@ -86,7 +148,17 @@ namespace pickc {
    * このメッセージはOutputMessageKind::Fatalであり、コンパイル作業を直ちに中断する必要がある。
    */
   struct InternalErrorMessage : public OutputMessage {
+    /**
+     * @brief エラーが発生したファイル名。
+     * 
+     */
     std::string filename;
+    /**
+     * @brief InternalErrorMessageを構築する。
+     * 
+     * @param filename エラーが発生したファイル名。ファイルに関連しない場合は空文字。
+     * @param message エラーメッセージ。
+     */
     InternalErrorMessage(const std::string& filename, const std::string message);
     virtual std::string toString() const override;
   };
@@ -96,9 +168,28 @@ namespace pickc {
    * 
    */
   class OutputBuffer {
+    /**
+     * @brief メッセージ一覧。
+     * 
+     */
     std::vector<std::unique_ptr<OutputMessage>> messages;
   public:
+    /**
+     * @brief メッセージを挿入する。
+     * 
+     * @param message 挿入するメッセージ。
+     */
     void push(std::unique_ptr<OutputMessage>&& message);
+    /**
+     * @brief メッセージを構築し、挿入する。
+     * メッセージをstd::unique_ptrで管理しているため、
+     * 挿入が少々面倒であるので、
+     * 簡素化するためのヘルパー関数。
+     * 
+     * @tparam Message 構築するメッセージ。
+     * @tparam Value メッセージのコンストラクタ引数の型。
+     * @param values メッセージのコンストラクタ引数。
+     */
     template<typename Message, typename... Value>
     void emplace(Value&&... values) {
       push(std::make_unique<Message>(std::forward<Value>(values)...));

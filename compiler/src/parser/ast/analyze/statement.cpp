@@ -1,3 +1,13 @@
+/**
+ * @file statement.cpp
+ * @author cosocaf (cosocaf@gmail.com)
+ * @brief ASTGenerator::analyzeStatementの実装
+ * @version 0.1
+ * @date 2021-07-24
+ * 
+ * @copyright Copyright (c) 2021 cosocaf
+ * 
+ */
 #include "../generator.h"
 
 namespace pickc::parser {

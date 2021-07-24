@@ -14,8 +14,6 @@
 #include <string>
 #include <vector>
 
-#include "utils/result.h"
-
 namespace pickc
 {
   /**
@@ -37,15 +35,55 @@ namespace pickc
    * 
    */
   struct CompilerOption {
+    /**
+     * @brief --helpオプションが指定されている場合にtrue。
+     * 
+     */
     bool help;
+    /**
+     * @brief --versionオプションが指定されている場合にtrue。
+     * 
+     */
     bool version;
+    /**
+     * @brief --targetオプションで指定された値。
+     * 
+     */
     TargetPlatforms target;
+    /**
+     * @brief -gオプションが指定された場合にtrue。
+     * 
+     */
     bool debug;
+    /**
+     * @brief --projectオプションで指定された値。
+     * 
+     */
     std::string projectName;
+    /**
+     * @brief --mainオプションで指定された値。
+     * 
+     */
     std::string mainModule;
+    /**
+     * @brief --srcオプションで指定された値。
+     * 
+     */
     std::string srcDir;
+    /**
+     * @brief --outオプションで指定された値。
+     * 
+     */
     std::string outName;
+    /**
+     * @brief --out-dirオプションで指定された値。
+     * 
+     */
     std::string outDir;
+    /**
+     * @brief --libraryオプションで指定された値。
+     * 
+     */
     std::vector<std::string> libraries;
   };
   /**

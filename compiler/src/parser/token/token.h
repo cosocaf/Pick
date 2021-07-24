@@ -59,10 +59,40 @@ namespace pickc::parser {
      * 
      */
     size_t letter;
+    /**
+     * @brief Tokenを構築する。
+     * 
+     * @param kind トークンの種別
+     * @param value トークンの値
+     * @param line ファイル内のトークンの開始行
+     * @param letter ファイル内のトークンの開始カラム
+     */
     Token(TokenKind kind, const std::string& value, size_t line, size_t letter);
+    /**
+     * @brief コピーコンストラクタ
+     * 
+     * @param token コピー元
+     */
     Token(const Token& token);
+    /**
+     * @brief ムーブコンストラクタ。
+     * 
+     * @param token ムーブ元
+     */
     Token(Token&& token);
+    /**
+     * @brief コピー代入。
+     * 
+     * @param token コピー元
+     * @return Token& *this
+     */
     Token& operator=(const Token& token);
+    /**
+     * @brief ムーブ代入。
+     * 
+     * @param token ムーブ元
+     * @return Token& *this
+     */
     Token& operator=(Token&& token);
   };
   /**

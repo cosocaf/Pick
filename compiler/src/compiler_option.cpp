@@ -13,6 +13,7 @@
 #include <vector>
 #include <string>
 #include <optional>
+#include <cassert>
 
 #include "config.h"
 #include "output_buffer.h"

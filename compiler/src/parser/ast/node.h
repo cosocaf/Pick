@@ -37,6 +37,17 @@ namespace pickc::parser {
   using ConditionalNode = std::shared_ptr<_ConditionalNode>;
   using RootNode = std::shared_ptr<_RootNode>;
 
+  /**
+   * @brief ASTNodeを作成するためのヘルパー関数。
+   * ASTNodeをstd::shared_ptrで管理するため、
+   * インスタンス化が少々面倒なので、
+   * この関数を使用して作成する。
+   * 
+   * @tparam T ASTNodeの具象構造体
+   * @tparam Value Tのコンストラクタ引数の型
+   * @param values Tのコンストラクタ引数
+   * @return T 作成したTのオブジェクト
+   */
   template<typename T, typename... Value>
   T makeASTNode(Value&&... values) {
     return std::make_shared<std::remove_reference<decltype(*(T()))>::type>(std::forward<Value>(values)...);
@@ -91,18 +102,34 @@ namespace pickc::parser {
   struct _FormulaNode : public _StatementNode {
     using _StatementNode::_StatementNode;
   };
+  /**
+   * @brief 即値を表現するノード。
+   * 
+   */
   struct _ImmediateNode : public _FormulaNode {
     using _FormulaNode::_FormulaNode;
   };
+  /**
+   * @brief 整数リテラルを表現するノード。
+   * 
+   */
   struct _IntegerNode : public _ImmediateNode {
     int value;
     _IntegerNode(const RootNode& rootNode, const ASTNode& parentNode, int value);
     ~_IntegerNode() = default;
   };
+  /**
+   * @brief ブロックを表現するノード。
+   * 
+   */
   struct _BlockNode : public _FormulaNode {
     std::vector<StatementNode> statements;
     using _FormulaNode::_FormulaNode;
   };
+  /**
+   * @brief ifやwhileなどの条件分岐を表現するノード。
+   * 
+   */
   struct _ConditionalNode : public _FormulaNode {};
   /**
    * @brief ASTの根になるノード。

@@ -17,17 +17,26 @@
 #include "token/token.h"
 
 namespace pickc::parser {
+  /**
+   * @brief ASTを生成する。
+   * 
+   */
   class ASTGenerator {
     bool done;
     RootNode rootNode;
     TokenSequence sequence;
     size_t curIndex;
   public:
+    /**
+     * @brief ASTGeneratorを構築する。
+     * 
+     * @param sequence ASTを構築するトークン列
+     */
     ASTGenerator(const TokenSequence& sequence);
     /**
      * @brief ASTを生成する
      * 
-     * @return std::optional<RootNode> 
+     * @return std::optional<RootNode> ASTのルートノード 
      */
     std::optional<RootNode> generate();
   private:
