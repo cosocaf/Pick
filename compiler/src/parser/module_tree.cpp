@@ -11,50 +11,75 @@
 #include "module_tree.h"
 
 namespace pickc::parser {
-  ModuleTree::ModuleTree(const ModuleTree& other) :
+  _ModuleTree::_ModuleTree(const _ModuleTree& other) :
     name(other.name),
     filename(other.filename),
     directoryModule(other.directoryModule),
+    parentModule(other.parentModule),
     submodules(other.submodules),
     tokenSequence(other.tokenSequence),
     rootNode(other.rootNode) {}
-  ModuleTree::ModuleTree(ModuleTree&& other) :
+  _ModuleTree::_ModuleTree(_ModuleTree&& other) :
     name(std::move(other.name)),
     filename(std::move(other.filename)),
     directoryModule(other.directoryModule),
+    parentModule(std::move(other.parentModule)),
     submodules(std::move(other.submodules)),
     tokenSequence(std::move(other.tokenSequence)),
     rootNode(std::move(other.rootNode)) {}
-  ModuleTree::ModuleTree(const std::string& name, const std::string& filename, bool directoryModule) :
+  _ModuleTree::_ModuleTree(const std::string& name, const std::string& filename, bool directoryModule, const ModuleTree& parentModule) :
     name(name),
     filename(filename),
-    directoryModule(directoryModule) {}
+    directoryModule(directoryModule),
+    parentModule(parentModule) {}
 
-  ModuleTree& ModuleTree::push(const std::string& subname, const std::string& subfilename, bool subdirectoryModule) {
-    return submodules.emplace_back(subname, subfilename, subdirectoryModule);
+  ModuleTree& _ModuleTree::push(const std::string& subname, const std::string& subfilename, bool subdirectoryModule) {
+    return submodules.emplace_back(
+      std::make_shared<_ModuleTree>(
+        subname,
+        subfilename,
+        subdirectoryModule,
+        shared_from_this()
+      )
+    );
   }
-  ModuleTree& ModuleTree::push(const ModuleTree& module) {
-    return submodules.emplace_back(module);
-  }
-  std::string& ModuleTree::getName() {
+  std::string _ModuleTree::getName() const {
     return name;
   }
-  std::string& ModuleTree::getFilename() {
+  std::string _ModuleTree::getFullyQualifiedName() const {
+    if(parentModule) {
+      return parentModule->getFullyQualifiedName() + "::" + name;
+    }
+    return name;
+  }
+  std::string _ModuleTree::getFilename() const {
     return filename;
   }
-  bool ModuleTree::isDirectoryModule() {
+  bool _ModuleTree::isDirectoryModule() const {
     return directoryModule;
   }
-  TokenSequence& ModuleTree::getTokenSequence() {
+  TokenSequence _ModuleTree::getTokenSequence() const {
     return tokenSequence;
   }
-  RootNode& ModuleTree::getRootNode() {
+  void _ModuleTree::setTokenSequence(const TokenSequence& sequence) {
+    tokenSequence = sequence;
+  }
+  RootNode _ModuleTree::getRootNode() const {
     return rootNode;
   }
-  std::vector<ModuleTree>::iterator ModuleTree::begin() {
+  void _ModuleTree::setRootNode(const RootNode& node) {
+    rootNode = node;
+  }
+  std::vector<ModuleTree>::iterator _ModuleTree::begin() {
     return submodules.begin();
   }
-  std::vector<ModuleTree>::iterator ModuleTree::end() {
+  std::vector<ModuleTree>::iterator _ModuleTree::end() {
+    return submodules.end();
+  }
+  std::vector<ModuleTree>::const_iterator _ModuleTree::begin() const {
+    return submodules.begin();
+  }
+  std::vector<ModuleTree>::const_iterator _ModuleTree::end() const {
     return submodules.end();
   }
 }

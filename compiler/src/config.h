@@ -69,6 +69,7 @@ namespace pickc
   constexpr auto STATUS_UNKNOWN_PLATFORM          = 0x00000010;
   constexpr auto STATUS_WINDOWS_X64_ERROR         = 0x00000020;
   constexpr auto STATUS_WINDOWS_X64_LINKER_ERROR  = 0x00000040;
+  constexpr auto STATUS_INTERNAL_ERROR            = 0x80000000;
 }
 
 #endif // PICKC_PICKC_CONFIG_H_

@@ -10,12 +10,14 @@
  */
 
 #include <iostream>
+#include <filesystem>
 
 #include "config.h"
 #include "compiler_option.h"
 #include "output_buffer.h"
 
 #include "parser/parser.h"
+#include "pcir/generator.h"
 
 /**
  * @brief コンパイラのエントリポイント。
@@ -26,6 +28,8 @@
  */
 int main(int argc, char* argv[]) {
   using namespace pickc;
+
+  std::locale::global(std::locale(""));
 
   initCompilerOption(argc, argv);
   if(outputBuffer.has()) {
@@ -46,6 +50,28 @@ int main(int argc, char* argv[]) {
   if(outputBuffer.has()) {
     outputBuffer.output(OutputMessageKind::All);
     return STATUS_PARSER_ERROR;
+  }
+
+  pcir::PCIRGenerator pcirGenerator(rootModule.value());
+  if(!pcirGenerator.generate()) {
+    outputBuffer.output(OutputMessageKind::All);
+    return STATUS_PCIR_ERROR;
+  }
+
+  std::error_code e;
+  std::filesystem::create_directories(compilerOption.outDir, e);
+  if(e) {
+    outputBuffer.emplace<InternalErrorMessage>("", "ディレクトリの作成に失敗しました。: " + compilerOption.outDir + " : " + e.message());
+    outputBuffer.output(OutputMessageKind::All);
+    return STATUS_INTERNAL_ERROR;
+  }
+
+  std::filesystem::path pcirFilePath = compilerOption.outDir;
+  pcirFilePath /= compilerOption.projectName + ".pcir";
+
+  if(!pcirGenerator.writeToFile(pcirFilePath.string())) {
+    outputBuffer.output(OutputMessageKind::All);
+    return STATUS_PCIR_ERROR;
   }
 
   outputBuffer.output(OutputMessageKind::All);

@@ -16,6 +16,9 @@ namespace pickc
     vec.insert(vec.end(), value.begin(), value.end());
     return vec;
   }
+  void align(BinaryVec& vec, size_t align, uint8_t fill) {
+    vec.resize((vec.size() + align - 1) / align * align, fill);
+  }
   uint8_t get8(const BinaryVec& vec, size_t& i)
   {
     return vec[++i];

@@ -61,7 +61,8 @@ namespace pickc::parser {
     std::weak_ptr<_RootNode> rootNode;
     std::weak_ptr<_ASTNode> parentNode;
     _ASTNode(const RootNode& rootNode, const ASTNode& parentNode);
-    virtual ~_ASTNode() = 0;
+    virtual ~_ASTNode();
+    virtual std::string dump(const std::string& indent) const = 0;
   };
   /**
    * @brief 文を表現する抽象ノード。
@@ -79,6 +80,7 @@ namespace pickc::parser {
     FormulaNode body;
     using _StatementNode::_StatementNode;
     virtual ~_FunctionNode() = default;
+    virtual std::string dump(const std::string& indent) const override;
   };
   enum struct ControlNodeKind {
     Return,
@@ -94,6 +96,7 @@ namespace pickc::parser {
     FormulaNode formula;
     _ControlNode(const RootNode& rootNode, const ASTNode& parentNode, ControlNodeKind kind);
     virtual ~_ControlNode() = default;
+    virtual std::string dump(const std::string& indent) const override;
   };
   /**
    * @brief 式を表現する抽象ノード。
@@ -117,6 +120,7 @@ namespace pickc::parser {
     int value;
     _IntegerNode(const RootNode& rootNode, const ASTNode& parentNode, int value);
     ~_IntegerNode() = default;
+    virtual std::string dump(const std::string& indent) const override;
   };
   /**
    * @brief ブロックを表現するノード。
@@ -125,6 +129,7 @@ namespace pickc::parser {
   struct _BlockNode : public _FormulaNode {
     std::vector<StatementNode> statements;
     using _FormulaNode::_FormulaNode;
+    virtual std::string dump(const std::string& indent) const override;
   };
   /**
    * @brief ifやwhileなどの条件分岐を表現するノード。
@@ -144,6 +149,7 @@ namespace pickc::parser {
     std::vector<FunctionNode> functions;
     _RootNode();
     virtual ~_RootNode() = default;
+    virtual std::string dump(const std::string& indent) const override;
   };
 }
 

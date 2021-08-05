@@ -3,10 +3,13 @@
 
 namespace pickc
 {
-  template <typename Of, typename What>
-  inline bool instanceof(const What w)
-  {
-    return dynamic_cast<const Of*>(w) != nullptr;
+  template<typename Of, typename What>
+  inline bool instanceof(const What w) {
+    return dynamic_cast<Of*>(w) != nullptr;
+  }
+  template<typename Of, typename What>
+  inline bool instanceof(std::shared_ptr<What> w) {
+    return std::dynamic_pointer_cast<Of::element_type>(w) != nullptr;
   }
 }
 

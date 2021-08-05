@@ -25,6 +25,10 @@ elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-long-long -pedantic")
 endif()
 
+if(WIN32)
+  set(CMAKE_SHARED_LINKER_FLAGS /MANIFEST:NO)
+endif(WIN32)
+
 enable_testing()
 
 include_directories(${SRC_DIR})

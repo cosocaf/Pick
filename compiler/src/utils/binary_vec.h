@@ -27,6 +27,16 @@ namespace pickc
     vec.insert(vec.end(), std::begin(value), std::end(value) - 1);
     return vec;
   }
+  template<typename T>
+  void write(BinaryVec& vec, size_t index, T value) {
+    if(index + sizeof(T) > vec.size()) {
+      vec.resize(index + sizeof(T));
+    }
+    for(int i = 0; i < sizeof(T); ++i) {
+      vec[index + i] = *(((uint8_t*)&value) + i);
+    }
+  }
+  void align(BinaryVec& vec, size_t align, uint8_t fill = 0x00);
   uint8_t get8(const BinaryVec& vec, size_t& i);
   uint16_t get16(const BinaryVec& vec, size_t& i);
   uint32_t get32(const BinaryVec& vec, size_t& i);

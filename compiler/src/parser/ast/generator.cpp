@@ -12,6 +12,7 @@
 
 #include <cassert>
 
+#include "compiler_option.h"
 #include "output_buffer.h"
 
 namespace pickc::parser {
@@ -20,6 +21,9 @@ namespace pickc::parser {
     assert(done == false);
     done = true;
 
+    if(compilerOption.debug) {
+      outputBuffer.emplace<OutputMessage>(OutputMessageKind::Debug, "Generate AST: " + sequence.filename);
+    }
     rootNode = makeASTNode<RootNode>();
 
     bool success = true;
@@ -39,7 +43,17 @@ namespace pickc::parser {
       }
     }
 
-    if(!success) return std::nullopt;
+    if(!success) {
+      if(compilerOption.debug) {
+        outputBuffer.emplace<OutputMessage>(OutputMessageKind::Debug, "Failed to generate AST: " + sequence.filename);
+      }
+      return std::nullopt;
+    }
+
+    if(compilerOption.debug) {
+      outputBuffer.emplace<OutputMessage>(OutputMessageKind::Debug, "AST generation has been completed: " + sequence.filename);
+      outputBuffer.emplace<OutputMessage>(OutputMessageKind::Debug, "Dump the AST: " + sequence.filename + "\n" + rootNode->dump(""));
+    }
     return rootNode;
   }
   std::optional<Token> ASTGenerator::cur() {

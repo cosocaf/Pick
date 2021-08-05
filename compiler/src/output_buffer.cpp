@@ -31,7 +31,7 @@ namespace pickc {
     filename(filename), line(line), letter(letter), length(length) {}
   std::string CompileErrorMessage::toString() const {
     // TODO: implement this
-    return "TODO(CompileErrorMessage::toString)";
+    return "TODO(CompileErrorMessage::toString): " + message;
   }
 
   InternalErrorMessage::InternalErrorMessage(const std::string& filename, const std::string message):
@@ -39,7 +39,7 @@ namespace pickc {
     filename(filename) {}
   std::string InternalErrorMessage::toString() const {
     // TODO: implement this
-    return "TODO(InternalErrorMessage::toString)";
+    return "TODO(InternalErrorMessage::toString): " + message;
   }
 
   void OutputBuffer::push(std::unique_ptr<OutputMessage>&& message) {

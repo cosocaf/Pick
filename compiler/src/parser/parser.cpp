@@ -22,7 +22,7 @@
 namespace pickc::parser {
   using dir_iter = std::filesystem::directory_iterator;
 
-  Parser::Parser() : rootModule(compilerOption.projectName, compilerOption.srcDir, true) {}
+  Parser::Parser() : rootModule(std::make_shared<_ModuleTree>(compilerOption.projectName, compilerOption.srcDir, true, nullptr)) {}
   void Parser::init() {
     constructModuleTree(compilerOption.srcDir, rootModule);
   }
@@ -34,10 +34,10 @@ namespace pickc::parser {
       auto name = entry.path().filename().string();
       auto filename = entry.path().string();
       if(entry.is_directory()) {
-        constructModuleTree(filename, module.push(name, filename, true));
+        constructModuleTree(filename, module->push(name, filename, true));
       }
       else if(entry.is_regular_file() && endsWith(name, ".pick")) {
-        module.push(name.substr(0, name.size() - 5), filename, false);
+        module->push(name.substr(0, name.size() - 5), filename, false);
       }
       itr.increment(err);
     }
@@ -58,24 +58,24 @@ namespace pickc::parser {
     return rootModule;
   }
   void Parser::tokenize(ModuleTree& module) {
-    if(!module.isDirectoryModule()) {
-      Tokenizer tokenizer(module.getFilename());
+    if(!module->isDirectoryModule()) {
+      Tokenizer tokenizer(module->getFilename());
       if(auto sequence = tokenizer.tokenize()) {
-        module.getTokenSequence() = std::move(sequence.value());
+        module->setTokenSequence(sequence.value());
       }
     }
-    for(auto& submodule : module) {
+    for(auto& submodule : *module) {
       tokenize(submodule);
     }
   }
   void Parser::ast(ModuleTree& module) {
-    if(!module.isDirectoryModule()) {
-      ASTGenerator generator(module.getTokenSequence());
+    if(!module->isDirectoryModule()) {
+      ASTGenerator generator(module->getTokenSequence());
       if(auto rootNode = generator.generate()) {
-        module.getRootNode() = rootNode.value();
+        module->setRootNode(rootNode.value());
       }
     }
-    for(auto& submodule : module) {
+    for(auto& submodule : *module) {
       ast(submodule);
     }
   }
