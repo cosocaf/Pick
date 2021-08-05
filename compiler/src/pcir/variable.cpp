@@ -1,7 +1,7 @@
 /**
  * @file variable.cpp
  * @author cosocaf (cosocaf@gmail.com)
- * @brief 
+ * @brief variable.hの実装
  * @version 0.1
  * @date 2021-08-01
  * 
@@ -13,10 +13,13 @@
 #include "output_buffer.h"
 
 namespace pickc::pcir {
-  Variable::Variable(const std::string& name, const Type& type, bool isMut, bool inited, const VariableTable& variableTable):
+  Variable::Variable(const std::string& name, const Type& type, bool isMut, bool inited, const WeakVariableTable& variableTable):
     name(name), type(type), isMut(isMut), inited(inited), variableTable(variableTable) {}
   uint32_t Variable::getIndex() const {
-    return static_cast<uint32_t>(std::distance(variableTable->variables.begin(), variableTable->variables.find(name)));
+    return variableTable.lock()->getIndex(*this);
+  }
+  std::string Variable::getName() const {
+    return name;
   }
   Type Variable::getType() const {
     return type;
@@ -37,6 +40,12 @@ namespace pickc::pcir {
   }
   std::string _VariableTable::nextAnonymousVariableName() {
     return "@" + std::to_string(anonymousVariableCount++);
+  }
+  uint32_t _VariableTable::getIndex(const Variable& var) const {
+    return static_cast<uint32_t>(std::distance(
+      variables.begin(),
+      variables.find(var.getName())
+    ));
   }
 
   uint32_t _VariableTable::size() const {

@@ -1,7 +1,7 @@
 /**
  * @file module_section.cpp
  * @author cosocaf (cosocaf@gmail.com)
- * @brief 
+ * @brief module_section.hの実装
  * @version 0.1
  * @date 2021-08-02
  * 

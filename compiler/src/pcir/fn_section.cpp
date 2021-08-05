@@ -1,7 +1,7 @@
 /**
  * @file fn.cpp
  * @author cosocaf (cosocaf@gmail.com)
- * @brief 
+ * @brief fn_section.hの実装
  * @version 0.1
  * @date 2021-07-29
  * 

@@ -1,7 +1,7 @@
 /**
  * @file byte_code.cpp
  * @author cosocaf (cosocaf@gmail.com)
- * @brief 
+ * @brief operator.hの実装
  * @version 0.1
  * @date 2021-07-28
  * 
