@@ -1,7 +1,7 @@
 /**
  * @file fn_generator.cpp
  * @author cosocaf (cosocaf@gmail.com)
- * @brief 
+ * @brief fn_generator.hの実装
  * @version 0.1
  * @date 2021-07-28
  * 
@@ -22,8 +22,8 @@ namespace pickc::pcir {
     fnNode(fnNode) {}
   Type FnGenerator::declare() {
     // TODO
-    return pcirGenerator->typeSection->createType(FnType(
-      pcirGenerator->typeSection->createType(LangDefinedTypes::I32),
+    return pcirGenerator->createType(FnType(
+      pcirGenerator->createType(LangDefinedTypes::I32),
       {}
     ));
   }
@@ -49,7 +49,7 @@ namespace pickc::pcir {
     }
     else if(instanceof<parser::IntegerNode>(formula)) {
       auto integer = dynCast<parser::IntegerNode>(formula);
-      auto var = fn->addVariable(pcirGenerator->typeSection->createType(LangDefinedTypes::I32));
+      auto var = fn->addVariable(pcirGenerator->createType(LangDefinedTypes::I32));
       curBlock->emplace<Imm32Operator>(var, integer->value);
       return var;
     }
@@ -88,6 +88,6 @@ namespace pickc::pcir {
     return std::nullopt;
   }
   Variable FnGenerator::createVoid(Fn& fn) {
-    return fn->addVariable(pcirGenerator->typeSection->createType(LangDefinedTypes::Void));
+    return fn->addVariable(pcirGenerator->createType(LangDefinedTypes::Void));
   }
 }

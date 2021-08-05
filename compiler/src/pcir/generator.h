@@ -1,7 +1,7 @@
 /**
  * @file generator.h
  * @author cosocaf (cosocaf@gmail.com)
- * @brief 
+ * @brief PCIRのジェネレータ
  * @version 0.1
  * @date 2021-07-24
  * 
@@ -10,9 +10,6 @@
  */
 #ifndef PICKC_PCIR_GENERATOR_H_
 #define PICKC_PCIR_GENERATOR_H_
-
-#include <vector>
-#include <optional>
 
 #include "text_section.h"
 #include "module_section.h"
@@ -30,16 +27,12 @@ namespace pickc::pcir {
     TypeSection typeSection;
     SymbolSection symbolSection;
     FnSection fnSection;
-    friend class _TextSection;
-    friend class _ModuleSection;
-    friend class _TypeSection;
-    friend class _SymbolSection;
-    friend class _FnSection;
-    friend class FnGenerator;
   public:
     PCIRGenerator(const parser::ModuleTree& rootModule);
     bool generate();
     bool writeToFile(const std::string& filename);
+
+    Type createType(const TypeVariant& typeVariant);
   private:
     bool declare(const std::string& parentName, const parser::ModuleTree& module);
     bool generate(const parser::ModuleTree& module);

@@ -52,9 +52,10 @@ namespace pickc::pcir {
   }
   bool PCIRGenerator::writeToFile(const std::string& filename) {
     BinaryVec bin;
-    bin << "PCIR";
-    bin << MAJOR_VERSION << MINOR_VERSION;
-    bin << static_cast<uint64_t>(std::time(nullptr));
+    bin << "PCIR"
+        << MAJOR_VERSION
+        << MINOR_VERSION
+        << static_cast<uint64_t>(std::time(nullptr));
     for(auto byte : genFileID()) {
       bin << byte;
     }
@@ -97,6 +98,11 @@ namespace pickc::pcir {
 
     return true;
   }
+
+  Type PCIRGenerator::createType(const TypeVariant& typeVariant) {
+    return typeSection->createType(typeVariant);
+  }
+
   bool PCIRGenerator::declare(const std::string& parentName, const parser::ModuleTree& moduleTree) {
     bool suc = true;
 
