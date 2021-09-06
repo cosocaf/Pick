@@ -56,6 +56,11 @@ namespace pickc::pcir {
    */
   using WeakCodeBlock = std::weak_ptr<_CodeBlock>;
 
+  enum struct FnKind : uint16_t {
+    Internal = 0x0001,
+    External = 0x0002,
+  };
+
   /**
    * @brief ブロックの種別の列挙。
    * 

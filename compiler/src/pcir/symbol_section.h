@@ -36,6 +36,11 @@ namespace pickc::pcir {
    */
   using WeakSymbol = std::weak_ptr<_Symbol>;
 
+  enum struct SymbolKind : uint16_t {
+    Internal = 0x0001,
+    External = 0x0002,
+  };
+
   /**
    * @brief シンボル。
    * 基本的にこのクラスを直接扱わず、SymbolやWeakSymbolを使用する。

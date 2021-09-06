@@ -58,16 +58,12 @@ namespace pickc::pcir {
         << static_cast<uint32_t>(0);
     for(const auto& symbol : symbols) {
       bin << symbol->getName().getIndex()
+          << SymbolKind::Internal
           << symbol->getType()->getIndex()
-          << symbol->getMutability();
-      auto initFn = symbol->getInitFn();
-      if(initFn) {
-        bin << initFn.value()->getIndex();
-      }
-      else {
-        bin << static_cast<uint32_t>(-1);
-      }
+          << symbol->getMutability()
+          << symbol->getInitFn().value()->getIndex();
     }
+    // TODO: external symbols.
     write(bin, 0, static_cast<uint32_t>(bin.size()));
     return bin;
   }

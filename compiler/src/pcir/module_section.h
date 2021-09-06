@@ -18,6 +18,7 @@
 #include "text_section.h"
 #include "type_section.h"
 #include "symbol_section.h"
+#include "fn_section.h"
 #include "accessibility.h"
 
 #include "utils/binary_vec.h"
@@ -57,6 +58,7 @@ namespace pickc::pcir {
     Accessibility accessibility;
     std::map<Text, Type> types;
     std::map<Text, Symbol> symbols;
+    std::vector<Fn> fns;
   public:
     /**
      * @brief _Moduleを構築する。
@@ -80,6 +82,12 @@ namespace pickc::pcir {
      * @param symbol シンボル
      */
     void addSymbol(const Text& name, const Symbol& symbol);
+    /**
+     * @brief 関数を追加する。
+     * 
+     * @param fn 追加する関数
+     */
+    void addFn(const Fn& fn);
     /**
      * @brief 特定の名前のシンボルを返す。
      * もし、シンボルが見つからなかった場合、例外が送出される。

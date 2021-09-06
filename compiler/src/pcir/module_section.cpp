@@ -24,6 +24,9 @@ namespace pickc::pcir {
   void _Module::addSymbol(const Text& name, const Symbol& symbol) {
     symbols.try_emplace(name, symbol);
   }
+  void _Module::addFn(const Fn& fn) {
+    fns.push_back(fn);
+  }
   Symbol _Module::findSymbol(const Text& name) {
     return symbols.at(name);
   }

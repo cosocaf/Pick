@@ -134,11 +134,11 @@ namespace pickc::pcir {
   BinaryVec _FnSection::toBinaryVec() const {
     BinaryVec bin;
     bin << static_cast<uint32_t>(0)
-        << static_cast<uint32_t>(fns.size())
-        << static_cast<uint32_t>(0);
+        << static_cast<uint32_t>(fns.size());
     for(const auto& fn : fns) {
       auto varTable = fn->getVariableTable();
       bin << fn->getType()->getIndex()
+          << FnKind::Internal
           << varTable->size()
           << fn->getCodeBlocksSize();
       for(const auto& [name, var] : *varTable) {
@@ -148,6 +148,7 @@ namespace pickc::pcir {
         bin << block->toBinaryVec();
       }
     }
+    // TODO: external functions.
     write(bin, 0, static_cast<uint32_t>(bin.size()));
     return bin;
   }
