@@ -46,6 +46,9 @@ namespace pickc::pcir {
   uint32_t _Module::getSymbolsSize() const {
     return static_cast<uint32_t>(symbols.size());
   }
+  uint32_t _Module::getFnsSize() const {
+    return static_cast<uint32_t>(fns.size());
+  }
   std::map<Text, Type>::iterator _Module::beginTypes() {
     return types.begin();
   }
@@ -69,6 +72,18 @@ namespace pickc::pcir {
   }
   std::map<Text, Symbol>::const_iterator _Module::endSymbols() const {
     return symbols.end();
+  }
+  std::vector<Fn>::iterator _Module::beginFns() {
+    return fns.begin();
+  }
+  std::vector<Fn>::iterator _Module::endFns() {
+    return fns.end();
+  }
+  std::vector<Fn>::const_iterator _Module::beginFns() const {
+    return fns.begin();
+  }
+  std::vector<Fn>::const_iterator _Module::endFns() const {
+    return fns.end();
   }
 
   ModuleSection _ModuleSection::create() {
@@ -101,7 +116,8 @@ namespace pickc::pcir {
           << module->getParentName().getIndex()
           << module->getAccessibility()
           << module->getTypesSize()
-          << module->getSymbolsSize();
+          << module->getSymbolsSize()
+          << module->getFnsSize();
       std::for_each(
         module->beginTypes(),
         module->endTypes(),
@@ -116,6 +132,13 @@ namespace pickc::pcir {
         [&bin](const auto& symbol) {
           bin << symbol.second->getIndex()
               << Accessibility::Public;
+        }
+      );
+      std::for_each(
+        module->beginFns(),
+        module->endFns(),
+        [&bin](const auto& fn) {
+          bin << fn->getIndex();
         }
       );
     }

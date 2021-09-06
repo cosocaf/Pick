@@ -126,6 +126,7 @@ namespace pickc::pcir {
      * @return uint32_t このモジュールに含まれるシンボルの数
      */
     uint32_t getSymbolsSize() const;
+    uint32_t getFnsSize() const;
     /**
      * @brief このモジュールに含まれる型の開始イテレータを返す。
      * 
@@ -174,6 +175,10 @@ namespace pickc::pcir {
      * @return std::map<Text, Symbol>::const_iterator 終了イテレータ
      */
     std::map<Text, Symbol>::const_iterator endSymbols() const;
+    std::vector<Fn>::iterator beginFns();
+    std::vector<Fn>::iterator endFns();
+    std::vector<Fn>::const_iterator beginFns() const;
+    std::vector<Fn>::const_iterator endFns() const;
   };
   /**
    * @brief モジュールセクション。
