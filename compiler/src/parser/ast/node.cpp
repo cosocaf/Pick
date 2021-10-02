@@ -73,7 +73,7 @@ namespace pickc::parser {
     res += "+-Result\n";
     res += indent;
     res += "  +-";
-    res += formula->dump(indent + "    ");
+    res += expr->dump(indent + "    ");
     return res;
   }
 
@@ -86,6 +86,25 @@ namespace pickc::parser {
 
   std::string _VariableNode::dump([[maybe_unused]] const std::string& indent) const {
     return "VariableNode(" + name + ")";
+  }
+
+  std::string _AddNode::dump(const std::string& indent) const {
+    std::string res = "AddNode\n";
+    res += indent;
+    res += "+-Operand1\n";
+    res += left->dump(indent + "| ");
+    res += "\n+-Operand2\n";
+    res += right->dump(indent + "  ");
+    return res;
+  }
+  std::string _SubNode::dump(const std::string& indent) const {
+    std::string res = "SubNode\n";
+    res += indent;
+    res += "+-Operand1\n";
+    res += left->dump(indent + "| ");
+    res += "\n+-Operand2\n";
+    res += right->dump(indent + "  ");
+    return res;
   }
 
   std::string _BlockNode::dump(const std::string& indent) const {

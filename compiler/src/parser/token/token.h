@@ -31,6 +31,8 @@ namespace pickc::parser {
     LBracket,         // [
     RBracket,         // ]
     Semicolon,        // ;
+    Add,              // +
+    Sub,              // -
     Asign,            // =
     Integer,          // [0-9]+
     Identify,         // xxx

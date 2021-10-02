@@ -110,9 +110,10 @@ namespace pickc::parser {
      * @brief 式を解析する。
      * 
      * @param parentNode このノードの親
-     * @return std::optional<FormulaNode> 解析結果 
+     * @return std::optional<ExpressionNode> 解析結果 
      */
-    std::optional<FormulaNode> analyzeFormula(ASTNode parentNode);
+    std::optional<ExpressionNode> analyzeExpression(ASTNode parentNode);
+    std::optional<ExpressionNode> analyzePrimaryExpression(ASTNode parentNode);
     /**
      * @brief ブロックを解析する。
      * 
@@ -141,6 +142,12 @@ namespace pickc::parser {
      * @return std::optional<VariableNode> 解析結果
      */
     std::optional<VariableNode> analyzeVariable(ASTNode parentNode);
+    std::optional<ExpressionNode> analyzeBackUnaryExpression(ASTNode parentNode);
+    std::optional<ExpressionNode> analyzeFrontUnaryExpression(ASTNode parentNode);
+    std::optional<ExpressionNode> analyzeFactor(ASTNode parentNode);
+    std::optional<ExpressionNode> analyzeTerm(ASTNode parentNode);
+    std::optional<ExpressionNode> analyzeCompare(ASTNode parentNode);
+    std::optional<ExpressionNode> analyzeAsign(ASTNode parentNode);
   };
 }
 

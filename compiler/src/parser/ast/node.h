@@ -21,24 +21,50 @@ namespace pickc::parser {
   struct _FunctionNode;
   struct _VariableDeclarationNode;
   struct _ControlNode;
-  struct _FormulaNode;
+  struct _ExpressionNode;
+  
+  struct _PrimaryExpressionNode;
   struct _ImmediateNode;
   struct _IntegerNode;
   struct _VariableNode;
   struct _BlockNode;
   struct _ConditionalNode;
+
+  struct _BackUnaryExpressionNode;
+
+  struct _FrontUnaryExpressionNode;
+
+  struct _FactorNode;
+
+  struct _TermNode;
+  struct _AddNode;
+  struct _SubNode;
+
+  struct _CompareNode;
+
+  struct _AsignNode;
+
   struct _RootNode;
   using ASTNode = std::shared_ptr<_ASTNode>;
   using StatementNode = std::shared_ptr<_StatementNode>;
   using FunctionNode = std::shared_ptr<_FunctionNode>;
   using VariableDeclarationNode = std::shared_ptr<_VariableDeclarationNode>;
   using ControlNode = std::shared_ptr<_ControlNode>;
-  using FormulaNode = std::shared_ptr<_FormulaNode>;
+  using ExpressionNode = std::shared_ptr<_ExpressionNode>;
+  using PrimaryExpressionNode = std::shared_ptr<_PrimaryExpressionNode>;
   using ImmediateNode = std::shared_ptr<_ImmediateNode>;
   using IntegerNode = std::shared_ptr<_IntegerNode>;
   using VariableNode = std::shared_ptr<_VariableNode>;
   using BlockNode = std::shared_ptr<_BlockNode>;
   using ConditionalNode = std::shared_ptr<_ConditionalNode>;
+  using BackUnaryExpressionNode = std::shared_ptr<_BackUnaryExpressionNode>;
+  using FrontUnaryExpressionNode = std::shared_ptr<_FrontUnaryExpressionNode>;
+  using FactorNode = std::shared_ptr<_FactorNode>;
+  using TermNode = std::shared_ptr<_TermNode>;
+  using AddNode = std::shared_ptr<_AddNode>;
+  using SubNode = std::shared_ptr<_SubNode>;
+  using CompareNode = std::shared_ptr<_CompareNode>;
+  using AsignNode = std::shared_ptr<_AsignNode>;
   using RootNode = std::shared_ptr<_RootNode>;
 
   /**
@@ -81,7 +107,7 @@ namespace pickc::parser {
    */
   struct _FunctionNode : public _StatementNode {
     std::string name;
-    FormulaNode body;
+    ExpressionNode body;
     using _StatementNode::_StatementNode;
     virtual ~_FunctionNode() = default;
     virtual std::string dump(const std::string& indent) const override;
@@ -93,7 +119,7 @@ namespace pickc::parser {
   struct _VariableDeclarationNode : public _StatementNode {
     std::string name;
     bool isMut;
-    FormulaNode value;
+    ExpressionNode value;
     using _StatementNode::_StatementNode;
     virtual ~_VariableDeclarationNode() = default;
     virtual std::string dump(const std::string& indent) const override;
@@ -109,7 +135,7 @@ namespace pickc::parser {
    */
   struct _ControlNode : public _StatementNode {
     ControlNodeKind kind;
-    FormulaNode formula;
+    ExpressionNode expr;
     _ControlNode(const RootNode& rootNode, const ASTNode& parentNode, ControlNodeKind kind);
     virtual ~_ControlNode() = default;
     virtual std::string dump(const std::string& indent) const override;
@@ -118,15 +144,18 @@ namespace pickc::parser {
    * @brief 式を表現する抽象ノード。
    * 
    */
-  struct _FormulaNode : public _StatementNode {
+  struct _ExpressionNode : public _StatementNode {
     using _StatementNode::_StatementNode;
+  };
+  struct _PrimaryExpressionNode : public _ExpressionNode {
+    using _ExpressionNode::_ExpressionNode;
   };
   /**
    * @brief 即値を表現するノード。
    * 
    */
-  struct _ImmediateNode : public _FormulaNode {
-    using _FormulaNode::_FormulaNode;
+  struct _ImmediateNode : public _PrimaryExpressionNode {
+    using _PrimaryExpressionNode::_PrimaryExpressionNode;
   };
   /**
    * @brief 整数リテラルを表現するノード。
@@ -142,9 +171,9 @@ namespace pickc::parser {
    * @brief 変数を表現するノード。
    * 
    */
-  struct _VariableNode : public _FormulaNode {
+  struct _VariableNode : public _PrimaryExpressionNode {
     std::string name;
-    using _FormulaNode::_FormulaNode;
+    using _PrimaryExpressionNode::_PrimaryExpressionNode;
     virtual ~_VariableNode() = default;
     virtual std::string dump(const std::string& indent) const override;
   };
@@ -152,16 +181,55 @@ namespace pickc::parser {
    * @brief ブロックを表現するノード。
    * 
    */
-  struct _BlockNode : public _FormulaNode {
+  struct _BlockNode : public _PrimaryExpressionNode {
     std::vector<StatementNode> statements;
-    using _FormulaNode::_FormulaNode;
+    using _PrimaryExpressionNode::_PrimaryExpressionNode;
     virtual std::string dump(const std::string& indent) const override;
   };
   /**
    * @brief ifやwhileなどの条件分岐を表現するノード。
    * 
    */
-  struct _ConditionalNode : public _FormulaNode {};
+  struct _ConditionalNode : public _PrimaryExpressionNode {
+    using _PrimaryExpressionNode::_PrimaryExpressionNode;
+  };
+
+  struct _BackUnaryExpressionNode : public _ExpressionNode {
+    using _ExpressionNode::_ExpressionNode;
+  };
+
+  struct _FrontUnaryExpressionNode : public _ExpressionNode {
+    using _ExpressionNode::_ExpressionNode;
+  };
+
+  struct _FactorNode : public _ExpressionNode {
+    using _ExpressionNode::_ExpressionNode;
+  };
+
+  struct _TermNode : public _ExpressionNode {
+    ExpressionNode left;
+    ExpressionNode right;
+    using _ExpressionNode::_ExpressionNode;
+  };
+  struct _AddNode : public _TermNode {
+    using _TermNode::_TermNode;
+    virtual ~_AddNode() = default;
+    virtual std::string dump(const std::string& indent) const override;
+  };
+  struct _SubNode : public _TermNode {
+    using _TermNode::_TermNode;
+    virtual ~_SubNode() = default;
+    virtual std::string dump(const std::string& indent) const override;
+  };
+
+  struct _CompareNode : public _ExpressionNode {
+    using _ExpressionNode::_ExpressionNode;
+  };
+
+  struct _AsignNode : public _ExpressionNode {
+    using _ExpressionNode::_ExpressionNode;
+  };
+  
   /**
    * @brief ASTの根になるノード。
    * 一つのモジュールを表現する。

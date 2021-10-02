@@ -35,7 +35,7 @@ namespace pickc::parser {
     if(auto res = next()) {
       if(res.value().kind == TokenKind::Asign) {
         if(!next(token, "式が必要です。")) return std::nullopt;
-        auto value = analyzeFormula(var);
+        auto value = analyzeExpression(var);
         if(!value) return std::nullopt;
         var->value = value.value();
       }

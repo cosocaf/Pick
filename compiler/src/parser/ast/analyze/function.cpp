@@ -41,7 +41,7 @@ namespace pickc::parser {
     }
     if(!next(token, "式が必要です。")) return std::nullopt;
 
-    if(auto formula = analyzeFormula(fn)) {
+    if(auto formula = analyzeExpression(fn)) {
       fn->body = formula.value();
     }
     else {

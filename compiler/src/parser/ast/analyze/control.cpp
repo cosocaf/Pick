@@ -28,8 +28,8 @@ namespace pickc::parser {
           assert(false);
         }
         else {
-          if(auto formula = analyzeFormula(ret)) {
-            ret->formula = std::move(formula.value());
+          if(auto expr = analyzeExpression(ret)) {
+            ret->expr = std::move(expr.value());
           }
           else {
             return std::nullopt;

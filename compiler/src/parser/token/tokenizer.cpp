@@ -50,6 +50,11 @@ namespace pickc::parser {
           case '[': clearBuffer(); pushToken(TokenKind::LBracket, "["); break;
           case ']': clearBuffer(); pushToken(TokenKind::RBracket, "]"); break;
           case ';': clearBuffer(); pushToken(TokenKind::Semicolon, ";"); break;
+          case '+':
+            // TODO: 複合代入演算子(+=), インクリメント(++)
+            clearBuffer();
+            pushToken(TokenKind::Add, "+");
+            break;
           case '=':
             // TODO: 比較演算子(==)
             clearBuffer();

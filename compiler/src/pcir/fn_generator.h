@@ -62,7 +62,7 @@ namespace pickc::pcir {
      * @param varName 解析結果を格納している変数の名前。無名変数であればnullopt
      * @return Variable 解析結果を格納している変数
      */
-    Variable analyzeFormula(Fn& fn, CodeBlock& curBlock, const parser::FormulaNode& formula, std::optional<std::string> varName = std::nullopt);
+    Variable analyzeExpression(Fn& fn, CodeBlock& curBlock, const parser::ExpressionNode& formula, std::optional<std::string> varName = std::nullopt);
     /**
      * @brief 文を解析する。
      * 
@@ -73,6 +73,7 @@ namespace pickc::pcir {
      * @return std::optional<Variable> 文が式であった場合はその式の結果。そうでない場合はnullopt 
      */
     std::optional<Variable> analyzeStatement(Fn& fn, CodeBlock& curBlock, const parser::StatementNode& statement, std::optional<std::string> varName = std::nullopt);
+    Variable createVariable(Fn& fn, const std::optional<std::string> &name, const pickc::pcir::Type &type);
     /**
      * @brief void型変数を作成する。
      * 

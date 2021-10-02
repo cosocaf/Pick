@@ -1,9 +1,9 @@
 /**
- * @file formula.cpp
+ * @file primary_expression.cpp
  * @author cosocaf (cosocaf@gmail.com)
- * @brief ASTGenerator::analyzeFormulaの実装
+ * @brief 
  * @version 0.1
- * @date 2021-07-24
+ * @date 2021-10-03
  * 
  * @copyright Copyright (c) 2021 cosocaf
  * 
@@ -13,7 +13,7 @@
 #include "output_buffer.h"
 
 namespace pickc::parser {
-  std::optional<FormulaNode> ASTGenerator::analyzeFormula(ASTNode parentNode) {
+  std::optional<ExpressionNode> ASTGenerator::analyzePrimaryExpression(ASTNode parentNode) {
     auto token = cur().value();
     switch(token.kind) {
       case TokenKind::LBrace:

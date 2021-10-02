@@ -24,7 +24,7 @@ namespace pickc::parser {
         next();
         return analyzeStatement(parentNode);
       default:
-        return analyzeFormula(parentNode);
+        return analyzeExpression(parentNode);
     }
   }
 }
