@@ -18,6 +18,8 @@
 
 #include "parser/parser.h"
 #include "pcir/generator.h"
+#include "bundler/bundler.h"
+#include "linker/linker.h"
 
 /**
  * @brief コンパイラのエントリポイント。
@@ -73,6 +75,20 @@ int main(int argc, char* argv[]) {
     outputBuffer.output(OutputMessageKind::All);
     return STATUS_PCIR_ERROR;
   }
+
+  bundler::Bundler bundler({pcirFilePath.string()});
+  auto bundle = bundler.bundle();
+  if(!bundle) {
+    outputBuffer.output(OutputMessageKind::All);
+    return STATUS_BUNDLER_ERROR;
+  }
+
+  std::filesystem::path buildFilePath = compilerOption.outDir;
+  buildFilePath /= compilerOption.projectName + ".exe";
+
+  linker::Linker linker(bundle.value());
+  linker.link();
+  linker.writeToFile(buildFilePath.string());
 
   outputBuffer.output(OutputMessageKind::All);
 

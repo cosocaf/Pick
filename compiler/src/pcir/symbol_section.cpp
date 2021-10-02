@@ -54,8 +54,7 @@ namespace pickc::pcir {
   BinaryVec _SymbolSection::toBinaryVec() const {
     BinaryVec bin;
     bin << static_cast<uint32_t>(0)
-        << static_cast<uint32_t>(symbols.size())
-        << static_cast<uint32_t>(0);
+        << static_cast<uint32_t>(symbols.size());
     for(const auto& symbol : symbols) {
       bin << symbol->getName().getIndex()
           << SymbolKind::Internal

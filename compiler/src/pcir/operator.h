@@ -17,6 +17,8 @@
 
 #include "utils/binary_vec.h"
 
+#include "opecode.h"
+
 namespace pickc::pcir {
   class _Fn;
   using WeakFn = std::weak_ptr<_Fn>;
@@ -44,7 +46,7 @@ namespace pickc::pcir {
    * res = op1 + op2;
    */
   class AddOperator : public Operator {
-    static constexpr uint8_t opecode = 0x00;
+    static constexpr uint8_t opecode = static_cast<uint8_t>(Opecode::ADD);
     Variable res;
     Variable op1;
     Variable op2;
@@ -64,7 +66,7 @@ namespace pickc::pcir {
    * res = imm32;
    */
   class Imm32Operator : public Operator {
-    static constexpr uint8_t opecode = 0x82;
+    static constexpr uint8_t opecode = static_cast<uint8_t>(Opecode::Imm32);
     Variable res;
     int32_t imm32;
   public: 
@@ -82,7 +84,7 @@ namespace pickc::pcir {
    * res = fn;
    */
   class LoadFnOperator : public Operator {
-    static constexpr uint8_t opecode = 0x90;
+    static constexpr uint8_t opecode = static_cast<uint8_t>(Opecode::LoadFn);
     Variable res;
     WeakFn fn;
   public:
