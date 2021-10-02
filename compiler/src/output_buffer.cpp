@@ -11,7 +11,7 @@
 #include "output_buffer.h"
 
 #include <iostream>
-
+#include <cassert>
 namespace pickc {
   OutputBuffer outputBuffer;
 
@@ -20,7 +20,13 @@ namespace pickc {
     return _kind;
   }
 
-  OutputMessage::OutputMessage(OutputMessageKind kind, const std::string& message) : kind(kind), message(message) {}
+  OutputMessage::OutputMessage(OutputMessageKind kind, const std::string& message) : kind(kind), message(message) {
+    #ifndef NDEBUG
+    if(kind == OutputMessageKind::Error) {
+      assert(false);
+    }
+    #endif
+  }
   OutputMessage::~OutputMessage() {}
   std::string OutputMessage::toString() const {
     return message;

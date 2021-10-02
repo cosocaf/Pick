@@ -50,6 +50,11 @@ namespace pickc::parser {
           case '[': clearBuffer(); pushToken(TokenKind::LBracket, "["); break;
           case ']': clearBuffer(); pushToken(TokenKind::RBracket, "]"); break;
           case ';': clearBuffer(); pushToken(TokenKind::Semicolon, ";"); break;
+          case '=':
+            // TODO: 比較演算子(==)
+            clearBuffer();
+            pushToken(TokenKind::Asign, "=");
+            break;
           default: pushBuffer(c);
         }
       }
@@ -66,6 +71,7 @@ namespace pickc::parser {
 
     TokenKind kind;
     if(buffer == "fn") kind = TokenKind::FnKeyword;
+    else if(buffer == "def") kind = TokenKind::DefKeyword;
     else if(buffer == "return") kind = TokenKind::ReturnKeyword;
     else if(std::regex_match(buffer, std::regex(R"(^[1-9][0-9]*$)"))) kind = TokenKind::Integer;
     else if(std::regex_match(buffer, std::regex(R"(^[_a-zA-Z][_a-zA-Z0-9]*$)"))) kind = TokenKind::Identify;

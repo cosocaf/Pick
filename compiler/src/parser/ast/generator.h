@@ -99,6 +99,14 @@ namespace pickc::parser {
      */
     std::optional<FunctionNode> analyzeFunction(ASTNode parentNode);
     /**
+     * @brief 変数宣言を解析する。
+     * sequence[cur].token.kindがTokenKind::DefKeywordである必要がある。
+     * 
+     * @param parentNode このノードの親
+     * @return std::optional<VariableDeclarationNode> 解析結果
+     */
+    std::optional<VariableDeclarationNode> analyzeVarDecl(ASTNode parentNode);
+    /**
      * @brief 式を解析する。
      * 
      * @param parentNode このノードの親
@@ -123,9 +131,16 @@ namespace pickc::parser {
      * @brief 即値を解析する。
      * 
      * @param parentNode このノードの親
-     * @return std::optional<ImmediateNode> 解析結果 
+     * @return std::optional<ImmediateNode> 解析結果
      */
     std::optional<ImmediateNode> analyzeImmediate(ASTNode parentNode);
+    /**
+     * @brief 変数を解析する。
+     * 
+     * @param parentNode このノードの親
+     * @return std::optional<VariableNode> 解析結果
+     */
+    std::optional<VariableNode> analyzeVariable(ASTNode parentNode);
   };
 }
 

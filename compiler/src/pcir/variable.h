@@ -14,6 +14,7 @@
 #include <string>
 #include <map>
 #include <memory>
+#include <optional>
 
 #include "type_section.h"
 
@@ -99,6 +100,13 @@ namespace pickc::pcir {
      * @return Variable 作成した変数
      */
     Variable createAnonymousVariable(const Type& type);
+    /**
+     * @brief 指定の名前の変数を探す。
+     * 
+     * @param name 変数名
+     * @return std::optional<Variable> 見つかった変数。無ければnullopt
+     */
+    std::optional<Variable> findVariable(const std::string& name);
     /**
      * @brief 変数テーブルに含まれる変数の数を取得する。
      * 

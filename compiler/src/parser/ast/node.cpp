@@ -33,6 +33,26 @@ namespace pickc::parser {
     return res;
   }
 
+  std::string _VariableDeclarationNode::dump(const std::string& indent) const {
+    std::string res = "VariableDeclarationNode(";
+    res += name;
+    res += ", mutable=";
+    res += isMut ? "true" : "false";
+    res += ")\n";
+    if(value) {
+      res += indent;
+      res += "+-Value\n";
+      res += indent;
+      res += "  +-";
+      res += value->dump(indent + "    ");
+    }
+    else {
+      res += indent;
+      res += "+-Value(None)";
+    }
+    return res;
+  }
+
   _ControlNode::_ControlNode(const RootNode& rootNode, const ASTNode& parentNode, ControlNodeKind kind) :
     _StatementNode(rootNode, parentNode),
     kind(kind) {};
@@ -60,8 +80,12 @@ namespace pickc::parser {
   _IntegerNode::_IntegerNode(const RootNode& rootNode, const ASTNode& parentNode, int value) :
     _ImmediateNode(rootNode, parentNode),
     value(value) {};
-  std::string _IntegerNode::dump(const std::string& indent) const {
+  std::string _IntegerNode::dump([[maybe_unused]] const std::string& indent) const {
     return "IntegerNode(" + std::to_string(value) + ")";
+  }
+
+  std::string _VariableNode::dump([[maybe_unused]] const std::string& indent) const {
+    return "VariableNode(" + name + ")";
   }
 
   std::string _BlockNode::dump(const std::string& indent) const {

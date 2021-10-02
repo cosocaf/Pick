@@ -12,9 +12,11 @@ add_library(
   ast/generator.cpp
   ast/analyze/statement.cpp
   ast/analyze/function.cpp
+  ast/analyze/var_decl.cpp
   ast/analyze/formula.cpp
   ast/analyze/control.cpp
   ast/analyze/immediate.cpp
+  ast/analyze/variable.cpp
   ast/analyze/block.cpp
 )
 

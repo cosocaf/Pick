@@ -92,6 +92,9 @@ namespace pickc::pcir {
   Variable _Fn::addVariable(const Type& varType) {
     return variableTable->createAnonymousVariable(varType);
   }
+  std::optional<Variable> _Fn::findVariable(const std::string& name) {
+    return variableTable->findVariable(name);
+  }
 
   uint32_t _Fn::getIndex() const {
     return index;

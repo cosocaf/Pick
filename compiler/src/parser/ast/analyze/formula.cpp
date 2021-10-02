@@ -20,6 +20,8 @@ namespace pickc::parser {
         return analyzeBlock(parentNode);
       case TokenKind::Integer:
         return analyzeImmediate(parentNode);
+      case TokenKind::Identify:
+        return analyzeVariable(parentNode);
       default:
         outputBuffer.emplace<CompileErrorMessage>(sequence.filename, token.line, token.letter, token.value.size(), "式ではありません。");
         return std::nullopt;

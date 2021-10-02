@@ -22,6 +22,7 @@ namespace pickc::parser {
    */
   enum struct TokenKind {
     FnKeyword,        // fn
+    DefKeyword,       // def
     ReturnKeyword,    // return
     LParen,           // (
     RParen,           // )
@@ -30,6 +31,7 @@ namespace pickc::parser {
     LBracket,         // [
     RBracket,         // ]
     Semicolon,        // ;
+    Asign,            // =
     Integer,          // [0-9]+
     Identify,         // xxx
     Unknown,          // 

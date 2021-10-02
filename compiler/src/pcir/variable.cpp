@@ -31,6 +31,14 @@ namespace pickc::pcir {
   Variable _VariableTable::createAnonymousVariable(const Type& type) {
     return createVariable(type, nextAnonymousVariableName());
   }
+  std::optional<Variable> _VariableTable::findVariable(const std::string& name) {
+    if(variables.find(name) != variables.end()) {
+      return variables.at(name);
+    }
+    else {
+      return std::nullopt;
+    }
+  }
   Variable _VariableTable::createVariable(const Type& type, const std::string& name) {
     auto res = variables.try_emplace(name, name, type, false, false, shared_from_this());
     if(!res.second) {
@@ -49,7 +57,7 @@ namespace pickc::pcir {
   }
 
   uint32_t _VariableTable::size() const {
-    return variables.size();
+    return static_cast<uint32_t>(variables.size());
   }
   std::map<std::string, Variable>::iterator _VariableTable::begin() {
     return variables.begin();

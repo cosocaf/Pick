@@ -12,6 +12,7 @@
 #define PICKC_PCIR_FN_GENERATOR_H_
 
 #include <optional>
+#include <string>
 
 #include "fn_section.h"
 #include "type_section.h"
@@ -58,18 +59,20 @@ namespace pickc::pcir {
      * @param fn 生成する関数
      * @param curBlock 現在のブロック
      * @param formula 解析する式
+     * @param varName 解析結果を格納している変数の名前。無名変数であればnullopt
      * @return Variable 解析結果を格納している変数
      */
-    Variable analyzeFormula(Fn& fn, CodeBlock& curBlock, const parser::FormulaNode& formula);
+    Variable analyzeFormula(Fn& fn, CodeBlock& curBlock, const parser::FormulaNode& formula, std::optional<std::string> varName = std::nullopt);
     /**
      * @brief 文を解析する。
      * 
      * @param fn 生成する関数
      * @param curBlock 現在のコードブロック
      * @param statement 解析する文
+     * @param varName 解析結果を格納している変数の名前。無名変数であればnullopt
      * @return std::optional<Variable> 文が式であった場合はその式の結果。そうでない場合はnullopt 
      */
-    std::optional<Variable> analyzeStatement(Fn& fn, CodeBlock& curBlock, const parser::StatementNode& statement);
+    std::optional<Variable> analyzeStatement(Fn& fn, CodeBlock& curBlock, const parser::StatementNode& statement, std::optional<std::string> varName = std::nullopt);
     /**
      * @brief void型変数を作成する。
      * 

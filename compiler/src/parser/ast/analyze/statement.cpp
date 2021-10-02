@@ -16,6 +16,8 @@ namespace pickc::parser {
     switch(token.kind) {
       case TokenKind::FnKeyword:
         return analyzeFunction(parentNode);
+      case TokenKind::DefKeyword:
+        return analyzeVarDecl(parentNode);
       case TokenKind::ReturnKeyword:
         return analyzeControl(parentNode);
       case TokenKind::Semicolon:

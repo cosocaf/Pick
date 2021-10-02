@@ -31,14 +31,14 @@ namespace pickc::pcir {
     auto entryBlock = fn->getEntryBlock();
     analyzeFormula(fn, entryBlock, fnNode->body);
   }
-  Variable FnGenerator::analyzeFormula(Fn& fn, CodeBlock& curBlock, const parser::FormulaNode& formula) {
+  Variable FnGenerator::analyzeFormula(Fn& fn, CodeBlock& curBlock, const parser::FormulaNode& formula, std::optional<std::string> varName) {
     if(instanceof<parser::BlockNode>(formula)) {
       auto block = dynCast<parser::BlockNode>(formula);
       auto nextBlock = fn->addBlock();
       curBlock->toNonTerminalBlock(std::weak_ptr(nextBlock));
       std::optional<Variable> var;
       for(const auto& statement : block->statements) {
-        var = analyzeStatement(fn, nextBlock, statement);
+        var = analyzeStatement(fn, nextBlock, statement, varName);
       }
       if(var) {
         return var.value();
@@ -49,27 +49,43 @@ namespace pickc::pcir {
     }
     else if(instanceof<parser::IntegerNode>(formula)) {
       auto integer = dynCast<parser::IntegerNode>(formula);
-      auto var = fn->addVariable(pcirGenerator->createType(LangDefinedTypes::I32));
-      curBlock->emplace<Imm32Operator>(var, integer->value);
-      return var;
+      std::optional<Variable> var;
+      if(varName) {
+        var = fn->addVariable(varName.value(), pcirGenerator->createType(LangDefinedTypes::I32));
+      }
+      else {
+        var = fn->addVariable(pcirGenerator->createType(LangDefinedTypes::I32));
+      }
+      curBlock->emplace<Imm32Operator>(var.value(), integer->value);
+      return var.value();
+    }
+    else if(instanceof<parser::VariableNode>(formula)) {
+      auto var = dynCast<parser::VariableNode>(formula);
+      auto find = fn->findVariable(var->name);
+      if(!find) {
+        // TODO: return error.
+        assert(false);
+      }
+      else {
+        return find.value();
+      }
     }
     else {
       // TODO:
       assert(false);
     }
   }
-  std::optional<Variable> FnGenerator::analyzeStatement(Fn& fn, CodeBlock& curBlock, const parser::StatementNode& statement) {
+  std::optional<Variable> FnGenerator::analyzeStatement(Fn& fn, CodeBlock& curBlock, const parser::StatementNode& statement, std::optional<std::string> varName) {
     if(instanceof<parser::FormulaNode>(statement)) {
-      return analyzeFormula(fn, curBlock, dynCast<parser::FormulaNode>(statement));
+      return analyzeFormula(fn, curBlock, dynCast<parser::FormulaNode>(statement), varName);
     }
-    
-    if(instanceof<parser::ControlNode>(statement)) {
+    else if(instanceof<parser::ControlNode>(statement)) {
       auto control = dynCast<parser::ControlNode>(statement);
       switch(control->kind) {
         case parser::ControlNodeKind::Return: {
           std::optional<Variable> ret;
           if(control->formula) {
-            ret = analyzeFormula(fn, curBlock, control->formula);
+            ret = analyzeFormula(fn, curBlock, control->formula, varName);
           }
           else {
             ret = createVoid(fn);
@@ -79,11 +95,21 @@ namespace pickc::pcir {
         }
         case parser::ControlNodeKind::Break:
           // TODO
+          assert(false);
           break;
         case parser::ControlNodeKind::Continue:
           // TODO
+          assert(false);
           break;
       }
+    }
+    else if(instanceof<parser::VariableDeclarationNode>(statement)) {
+      auto varDecl = dynCast<parser::VariableDeclarationNode>(statement);
+      analyzeFormula(fn, curBlock, varDecl->value, varDecl->name);
+    }
+    else {
+      // TODO
+      assert(false);
     }
     return std::nullopt;
   }

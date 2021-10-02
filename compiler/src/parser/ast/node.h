@@ -19,20 +19,24 @@ namespace pickc::parser {
   struct _ASTNode;
   struct _StatementNode;
   struct _FunctionNode;
+  struct _VariableDeclarationNode;
   struct _ControlNode;
   struct _FormulaNode;
   struct _ImmediateNode;
   struct _IntegerNode;
+  struct _VariableNode;
   struct _BlockNode;
   struct _ConditionalNode;
   struct _RootNode;
   using ASTNode = std::shared_ptr<_ASTNode>;
   using StatementNode = std::shared_ptr<_StatementNode>;
   using FunctionNode = std::shared_ptr<_FunctionNode>;
+  using VariableDeclarationNode = std::shared_ptr<_VariableDeclarationNode>;
   using ControlNode = std::shared_ptr<_ControlNode>;
   using FormulaNode = std::shared_ptr<_FormulaNode>;
   using ImmediateNode = std::shared_ptr<_ImmediateNode>;
   using IntegerNode = std::shared_ptr<_IntegerNode>;
+  using VariableNode = std::shared_ptr<_VariableNode>;
   using BlockNode = std::shared_ptr<_BlockNode>;
   using ConditionalNode = std::shared_ptr<_ConditionalNode>;
   using RootNode = std::shared_ptr<_RootNode>;
@@ -82,6 +86,18 @@ namespace pickc::parser {
     virtual ~_FunctionNode() = default;
     virtual std::string dump(const std::string& indent) const override;
   };
+  /**
+   * @brief 変数の宣言文を表現するノード。
+   * 
+   */
+  struct _VariableDeclarationNode : public _StatementNode {
+    std::string name;
+    bool isMut;
+    FormulaNode value;
+    using _StatementNode::_StatementNode;
+    virtual ~_VariableDeclarationNode() = default;
+    virtual std::string dump(const std::string& indent) const override;
+  };
   enum struct ControlNodeKind {
     Return,
     Break,
@@ -120,6 +136,16 @@ namespace pickc::parser {
     int value;
     _IntegerNode(const RootNode& rootNode, const ASTNode& parentNode, int value);
     ~_IntegerNode() = default;
+    virtual std::string dump(const std::string& indent) const override;
+  };
+  /**
+   * @brief 変数を表現するノード。
+   * 
+   */
+  struct _VariableNode : public _FormulaNode {
+    std::string name;
+    using _FormulaNode::_FormulaNode;
+    virtual ~_VariableNode() = default;
     virtual std::string dump(const std::string& indent) const override;
   };
   /**

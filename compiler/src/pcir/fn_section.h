@@ -14,6 +14,7 @@
 #include <vector>
 #include <memory>
 #include <variant>
+#include <optional>
 
 #include "type_section.h"
 #include "variable.h"
@@ -251,6 +252,13 @@ namespace pickc::pcir {
      * @return Variable 追加した変数
      */
     Variable addVariable(const Type& type);
+    /**
+     * @brief 指定の名前の変数を探す。
+     * 
+     * @param name 変数名
+     * @return std::optional<Variable> 見つかった変数。無ければnullopt
+     */
+    std::optional<Variable> findVariable(const std::string& name);
     
     /**
      * @brief この関数のインデックスを取得する。
