@@ -266,8 +266,47 @@ namespace pickc::linker::windows_x64 {
       rex |= 0b1000;
     }
     if(std::holds_alternative<Immediate>(src.rm)) {
-      // TODO
-      assert(false);
+      const auto& imm = std::get<Immediate>(src.rm);
+      if(std::holds_alternative<Register>(dst.rm)) {
+        const auto& reg = std::get<Register>(dst.rm);
+        switch(operandSize) {
+          case OperandSize::Byte:
+            res.push_back(0xB0 | static_cast<uint8_t>(reg));
+            res << static_cast<int8_t>(imm.value);
+            break;
+          case OperandSize::Word:
+            res.push_back(0xB8 | static_cast<uint8_t>(reg));
+            res << static_cast<int16_t>(imm.value);
+            break;
+          case OperandSize::DWord:
+            res.push_back(0xB8 | static_cast<uint8_t>(reg));
+            res << static_cast<int32_t>(imm.value);
+            break;
+          case OperandSize::QWord:
+            res.push_back(0xB8 | static_cast<uint8_t>(reg));
+            res << static_cast<int64_t>(imm.value);
+            break;
+          default:
+            assert(false);
+        }
+      }
+      else if(std::holds_alternative<Memory>(dst.rm)) {
+        assert(operandSize != OperandSize::QWord);
+        if(operandSize == OperandSize::Byte) {
+          res.push_back(0xC6);
+          res << modRM(Register::RAX, dst)
+              << static_cast<int8_t>(imm.value);
+        }
+        else {
+          res.push_back(0xC7);
+          res << modRM(Register::RAX, dst)
+              << static_cast<int32_t>(imm.value);
+        }
+      }
+      else {
+        // TODO
+        assert(false);
+      }
     }
     else if(std::holds_alternative<Register>(dst.rm)) {
       if(operandSize == OperandSize::Byte) {

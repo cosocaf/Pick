@@ -29,8 +29,9 @@ namespace pickc::linker::windows_x64 {
     RoutineCompiler(const Routine& routine);
     BinaryVec compile();
   private:
-    size_t requiredAllocatedMemoryArea(const bundler::TypeInfo& type);
-    size_t memoryAlignment(size_t offset, size_t size);
+    int32_t requiredAllocatedMemoryArea(const bundler::TypeInfo& type);
+    int32_t memoryAlignment(int32_t offset, int32_t size);
+    OperandSize getOperandSize(int32_t size);
   };
 }
 

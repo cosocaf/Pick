@@ -46,7 +46,7 @@ namespace pickc::linker {
     return true;
   }
   bool Linker::writeToFile(const std::string& filename) {
-    std::ofstream stream(filename);
+    std::ofstream stream(filename, std::ios::binary);
     if(!stream) {
       // TODO: return error.
       assert(false);

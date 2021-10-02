@@ -24,9 +24,9 @@ namespace pickc::linker {
   struct _Variable {
     bundler::TypeInfo type;
     // この変数が使用するメモリ領域の大きさ
-    size_t memoryArea;
+    int32_t memoryArea;
     // この変数が配置されるメモリ領域のオフセットアドレス
-    size_t memoryOffset;
+    int32_t memoryOffset;
   };
 }
 
