@@ -12,6 +12,7 @@
 namespace pickc {
   enum struct Opecode : uint8_t {
     ADD = 0x00,
+    SUB = 0x01,
     Imm8 = 0x80,
     Imm16 = 0x81,
     Imm32 = 0x82,

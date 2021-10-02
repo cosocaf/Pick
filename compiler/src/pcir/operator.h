@@ -62,6 +62,26 @@ namespace pickc::pcir {
     virtual void write(BinaryVec& out) const override;
   };
   /**
+   * @brief 減算命令。
+   * res = op1 - op2;
+   */
+  class SubOperator : public Operator {
+    static constexpr uint8_t opecode = static_cast<uint8_t>(Opecode::SUB);
+    Variable res;
+    Variable op1;
+    Variable op2;
+  public:
+    /**
+     * @brief SubOperator
+     * 
+     * @param res 計算結果
+     * @param op1 左オペランド
+     * @param op2 右オペランド
+     */
+    SubOperator(const Variable& res, const Variable& op1, const Variable& op2);
+    virtual void write(BinaryVec& out) const override;
+  };
+  /**
    * @brief 32bit即値代入命令。
    * res = imm32;
    */

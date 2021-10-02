@@ -17,6 +17,10 @@ namespace pickc::pcir {
   void AddOperator::write(BinaryVec& out) const {
     out << opecode << res.getIndex() << op1.getIndex() << op2.getIndex();
   }
+  SubOperator::SubOperator(const Variable& res, const Variable& op1, const Variable& op2) : res(res), op1(op1), op2(op2) {}
+  void SubOperator::write(BinaryVec& out) const {
+    out << opecode << res.getIndex() << op1.getIndex() << op2.getIndex();
+  }
 
   Imm32Operator::Imm32Operator(const Variable& res, int32_t imm32) : res(res), imm32(imm32) {}
   void Imm32Operator::write(BinaryVec& out) const {

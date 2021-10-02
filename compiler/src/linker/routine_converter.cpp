@@ -76,6 +76,13 @@ namespace pickc::linker {
           operators.emplace_back(AddOperator(routine.variables[res], routine.variables[op1], routine.variables[op2]));
           break;
         }
+        case Opecode::SUB: {
+          uint32_t res = get32(bytecode, i);
+          uint32_t op1 = get32(bytecode, i);
+          uint32_t op2 = get32(bytecode, i);
+          operators.emplace_back(SubOperator(routine.variables[res], routine.variables[op1], routine.variables[op2]));
+          break;
+        }
         case Opecode::Imm32: {
           uint32_t res = get32(bytecode, i);
           int32_t imm32 = get32(bytecode, i);

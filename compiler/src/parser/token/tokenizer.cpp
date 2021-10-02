@@ -55,6 +55,11 @@ namespace pickc::parser {
             clearBuffer();
             pushToken(TokenKind::Add, "+");
             break;
+          case '-':
+            // TODO: 複合代入演算子(-=), デクリメント(--)
+            clearBuffer();
+            pushToken(TokenKind::Sub, "-");
+            break;
           case '=':
             // TODO: 比較演算子(==)
             clearBuffer();

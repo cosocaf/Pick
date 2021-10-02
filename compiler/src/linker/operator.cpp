@@ -12,6 +12,7 @@
 
 namespace pickc::linker {
   AddOperator::AddOperator(const WeakVariable& res, const WeakVariable& op1, const WeakVariable& op2) : res(res), op1(op1), op2(op2) {}
+  SubOperator::SubOperator(const WeakVariable& res, const WeakVariable& op1, const WeakVariable& op2) : res(res), op1(op1), op2(op2) {}
   Imm32Operator::Imm32Operator(const WeakVariable& res, int32_t imm32) : res(res), imm32(imm32) {}
   LoadFnOperator::LoadFnOperator(const WeakVariable& res, int32_t fn) : res(res), fn(fn) {}
 }

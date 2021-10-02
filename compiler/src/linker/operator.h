@@ -22,6 +22,12 @@ namespace pickc::linker {
     WeakVariable op2;
     AddOperator(const WeakVariable& res, const WeakVariable& op1, const WeakVariable& op2);
   };
+  struct SubOperator {
+    WeakVariable res;
+    WeakVariable op1;
+    WeakVariable op2;
+    SubOperator(const WeakVariable& res, const WeakVariable& op1, const WeakVariable& op2);
+  };
   struct Imm32Operator {
     WeakVariable res;
     int32_t imm32;
@@ -35,6 +41,7 @@ namespace pickc::linker {
 
   using Operator = std::variant<
     AddOperator,
+    SubOperator,
     Imm32Operator,
     LoadFnOperator
   >;

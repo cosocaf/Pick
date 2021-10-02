@@ -72,6 +72,14 @@ namespace pickc::pcir {
       curBlock->emplace<AddOperator>(var, left, right);
       return var;
     }
+    else if(instanceof<parser::SubNode>(expr)) {
+      auto sub = dynCast<parser::SubNode>(expr);
+      auto left = analyzeExpression(fn, curBlock, sub->left);
+      auto right = analyzeExpression(fn, curBlock, sub->right);
+      auto var = createVariable(fn, varName, left.getType());
+      curBlock->emplace<SubOperator>(var, left, right);
+      return var;
+    }
     else {
       // TODO:
       assert(false);

@@ -1395,6 +1395,16 @@
           </td>
         </tr>
         <tr>
+          <td>SUB</td>
+          <td>0x01</td>
+          <td>$res, $op1, $op2</td>
+          <td>
+            $op1 - $op2を計算し、$resに代入する。
+            $op1,$op2,$resは整数または浮動小数かつ互いに同じ型でなければならず、
+            $op1,$op2は初期化済み、$resは未初期化でなければならない。
+          </td>
+        </tr>
+        <tr>
           <td>Imm8</td>
           <td>0x80</td>
           <td>$res, imm8</td>

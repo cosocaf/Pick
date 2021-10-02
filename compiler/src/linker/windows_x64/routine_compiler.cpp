@@ -41,6 +41,16 @@ namespace pickc::linker::windows_x64 {
           assembly.push_back(std::make_shared<Add>(opSize, Register::RAX, Memory(Register::RBP, -op2->memoryOffset)));
           assembly.push_back(std::make_shared<Mov>(opSize, Memory(Register::RBP, -res->memoryOffset), Register::RAX));
         }
+        else if(std::holds_alternative<SubOperator>(op)) {
+          auto sub = std::get<SubOperator>(op);
+          const auto& res = sub.res.lock();
+          const auto& op1 = sub.op1.lock();
+          const auto& op2 = sub.op2.lock();
+          auto opSize = getOperandSize(res->memoryArea);
+          assembly.push_back(std::make_shared<Mov>(opSize, Register::RAX, Memory(Register::RBP, -op1->memoryOffset)));
+          assembly.push_back(std::make_shared<Sub>(opSize, Register::RAX, Memory(Register::RBP, -op2->memoryOffset)));
+          assembly.push_back(std::make_shared<Mov>(opSize, Memory(Register::RBP, -res->memoryOffset), Register::RAX));
+        }
         else if(std::holds_alternative<Imm32Operator>(op)) {
           auto imm32 = std::get<Imm32Operator>(op);
           const auto& res = imm32.res.lock();
